@@ -10,6 +10,8 @@ import time
 import copy
 import os
 import shutil
+import matplotlib.pyplot as plt
+
 
 def check_data():
     dataset = 'eric_split_data'
@@ -81,28 +83,22 @@ def clean_directories(root_dir, selection_num):
 
 
 def load_data(data_path, model, feature_extract, input_size, batch_size):
-
-    
-
     data_transforms = {
         'train': transforms.Compose([
             transforms.RandomResizedCrop(input_size),
             transforms.RandomHorizontalFlip(),
+            transforms.RandomRotation(5),
             transforms.ToTensor(),
             transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]) #double check these are for Resnet50
         ]),
         'val': transforms.Compose([
-            transforms.RandomResizedCrop(input_size),
-            transforms.RandomHorizontalFlip(),
             transforms.ToTensor(),
             transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]) 
         ]),
     }
 
-
     image_datasets = {x: datasets.ImageFolder(os.path.join(data_path, x), data_transforms[x]) for x in ['train', 'val']}
     
-
     print(f"my batch size is {batch_size}")
     dataloaders_dict = {
         x: torch.utils.data.DataLoader(image_datasets[x], 
@@ -137,6 +133,7 @@ def params_to_learn(model, feature_extract):
 def train_model(model, dataloaders, criterion, optimizer, num_epochs, device, is_inception=False):
     since = time.time()
     val_acc_history = []
+    train_acc_history = []
 
     best_model_wts = copy.deepcopy(model.state_dict())
     best_acc = 0.0
@@ -158,31 +155,14 @@ def train_model(model, dataloaders, criterion, optimizer, num_epochs, device, is
             running_corrects = 0
             
             # Iterate over data.
-            # start_for = time.time()
-            start = time.time()
-            count = 0
             for inputs, labels in dataloaders[phase]:
-                # print(f"label values: {labels}, \n label size: {np.shape(labels)}")
-                # print(f"inputs size : {np.shape(inputs)}")
-                print(f"iter: {count}")
-                count+=1
-                # debug_time(4,start)
-                # start = time.time()
-                # debug_time(1,start)
-                # end_for = time.time()
-                # print(f"{phase} for loop took {end_for - start_for} sec to complete")
-                # start_for = time.time()
                 inputs = inputs.to(device)
                 labels = labels.to(device)
-                
-                # print(labels)
 
                 # zero the parameter gradients
                 optimizer.zero_grad()
 
                 # forward
-                # track history if only in train
-                # start_with = time.time()
                 with torch.set_grad_enabled(phase == 'train'):
                     # Get model outputs and calculate loss
                     # Special case for inception because in training it has an auxiliary output. In train
@@ -205,9 +185,6 @@ def train_model(model, dataloaders, criterion, optimizer, num_epochs, device, is
                     if phase == 'train':
                         loss.backward()
                         optimizer.step()
-                # end_with = time.time()
-                # print(f"with thing took {end_with - start_with}")
-                # debug_time(2,start)
                 # statistics
                 running_loss += loss.item() * inputs.size(0)
                 running_corrects += torch.sum(preds == labels.data)
@@ -220,15 +197,20 @@ def train_model(model, dataloaders, criterion, optimizer, num_epochs, device, is
             epoch_acc = running_corrects.float() / len(dataloaders[phase].dataset)
             # debug_time(5,start)
             print('{} Loss: {:.4f} Acc: {:.4f}'.format(phase, epoch_loss, epoch_acc))
+            print()
             
             # deep copy the model
             if phase == 'val' and epoch_acc > best_acc:
                 best_acc = epoch_acc
-                best_model_wts = copy.deepcopy(model.state_dict())
+                best_model_wts = copy.deepcopy(model.state_dict())  
+            if phase == 'train':
+                train_acc_history.append(epoch_acc)
             if phase == 'val':
                 val_acc_history.append(epoch_acc)
-            debug_time(6,start)
-        print()
+                if epoch > 0: make_graph(val_acc_history, train_acc_history, epoch)
+            
+
+            # debug_time(6,start)
       
     time_elapsed = time.time() - since
     print('Training complete in {:.0f}m {:.0f}s'.format(time_elapsed // 60, time_elapsed % 60))
@@ -236,9 +218,33 @@ def train_model(model, dataloaders, criterion, optimizer, num_epochs, device, is
 
     # load best model weights
     model.load_state_dict(best_model_wts)
-    return model, val_acc_history
+    return model, val_acc_history, train_acc_history
 
 
+def make_graph(val_hist, train_hist, num_epochs):
+    # Initialize the non-pretrained version of the model used for this run
+  
+    # Plot the training curves of validation accuracy vs. number
+    #  of training epochs for the transfer learning method and
+    #  the model trained from scratch
+    ohist = []
+    shist = []
+
+    vhist = [h.cpu().numpy() for h in val_hist]
+    thist = [h.cpu().numpy() for h in train_hist]
+
+    plt.title("Validation Accuracy vs. Number of Training Epochs")
+    plt.xlabel("Training Epochs")
+    plt.ylabel("Validation Accuracy")
+    print(f"about to plot")
+    print(f"vhist: {np.shape(vhist)} thist: {np.shape(thist)}, num_epochs: {num_epochs}")
+    plt.plot(range(1,num_epochs+2),vhist,label="Validation Accuracy")
+    plt.plot(range(1,num_epochs+2),thist,label="Training Accuracy")
+    plt.ylim((0,1.))
+    plt.xticks(np.arange(1, num_epochs+1, 1.0))
+    plt.legend()
+    plt.savefig(os.path.join('plot.png'))
+    # plt.show()
 
 def run():
     import ssl
@@ -251,10 +257,10 @@ def run():
     preprocess_resnet = weights_resnet.transforms() 
 
     model_names = ["resnet", "alexnet", "vgg", "squeezenet", "densenet", "inception"]
-    num_classes = 124 # CHECK
+    num_classes = 20 # CHECK
     # batch_sizes = [16, 32, 64, 128, 265]
     batch_size = 128
-    num_epochs = 15
+    num_epochs = 4
     feature_extract = True
     # Resnet50 takes inputs of dim (224,224,3)
     input_size = 224
@@ -285,7 +291,9 @@ def run():
     data_loader = load_data(data_path, model_resnet, feature_extract, input_size, batch_size)
 
     # Train  model
-    model, hist = train_model(model_resnet, data_loader, criterion, optimizer, num_epochs, device)
+    model, val_hist, train_hist = train_model(model_resnet, data_loader, criterion, optimizer, num_epochs, device)
+
+    # make_graph(val_hist, train_hist, num_epochs)
     
 
 if __name__ == '__main__':
