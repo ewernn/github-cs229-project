@@ -286,6 +286,7 @@ def run():
 
     # Train  model
     model, hist = train_model(model_resnet, data_loader, criterion, optimizer, num_epochs, device)
+    
 
 if __name__ == '__main__':
     # clean_directories(data_path, 75)
