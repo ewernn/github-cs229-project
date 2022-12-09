@@ -6,6 +6,7 @@ from torchvision.models import resnet50, ResNet50_Weights, alexnet, AlexNet_Weig
 from torchvision.datasets import ImageFolder
 import torch.optim as optim
 from torch import nn
+from torch.utils.data import WeightedRandomSampler
 import time
 import copy
 import os
@@ -14,7 +15,7 @@ import matplotlib.pyplot as plt
 
 
 def check_data():
-    dataset = 'eric_split_data'
+    dataset = 'top20_split_data'
     for kind in os.listdir(dataset):
         if kind == '.DS_Store': continue
         kind_path = dataset+'/'+kind
@@ -82,6 +83,7 @@ def clean_directories(root_dir, selection_num):
         remove_dirs(os.path.join(root_dir, mode), top_subfolders)
 
 
+
 def load_data(data_path, model, feature_extract, input_size, batch_size):
     data_transforms = {
         'train': transforms.Compose([
@@ -97,13 +99,25 @@ def load_data(data_path, model, feature_extract, input_size, batch_size):
         ]),
     }
 
+
+    train_dir = os.path.join(data_path, 'train')
+    weight = []
+    for country in os.listdir(train_dir):
+        new_dir = os.path.join(train_dir, country)
+        weight.append(len(os.listdir(new_dir)))
+    weight = 1. / weight
+    samples_weight = np.array(weight)
+    samples_weight = torch.from_numpy(samples_weight)
+    sampler = WeightedRandomSampler(samples_weight.type('torch.DoubleTensor'), len(samples_weight))
+
     image_datasets = {x: datasets.ImageFolder(os.path.join(data_path, x), data_transforms[x]) for x in ['train', 'val']}
     
+
     print(f"my batch size is {batch_size}")
     dataloaders_dict = {
         x: torch.utils.data.DataLoader(image_datasets[x], 
                                     batch_size=batch_size, 
-                                    shuffle=True, 
+                                    sampler = sampler, 
                                     num_workers=4
                                     ) 
         for x in ['train', 'val']
@@ -256,11 +270,21 @@ def run():
     weights_resnet = ResNet50_Weights.DEFAULT
     preprocess_resnet = weights_resnet.transforms() 
 
-    model_names = ["resnet", "alexnet", "vgg", "squeezenet", "densenet", "inception"]
     num_classes = 20 # CHECK
-    # batch_sizes = [16, 32, 64, 128, 265]
-    batch_size = 128
-    num_epochs = 4
+    
+    batch_sizes = [16, 264]
+    batch_size = np.random.random_integers(batch_sizes[0], batch_sizes[1])
+
+    learning_rates = [1, 1e-1, 1e-2, 1e-3, 1e-4, 1e-5, 1e-6]
+    learning_rate = np.random.choice(learning_rates)
+
+    alpha = np.random.uniform()
+
+    weight_decays = [1e-1, 1e-2, 1e-3, 1e-4, 1e-5, 1e-6]
+    weight_decay = np.random.choice(weight_decays)
+
+    num_epochs = 15
+
     feature_extract = True
     # Resnet50 takes inputs of dim (224,224,3)
     input_size = 224
@@ -275,7 +299,7 @@ def run():
     # Feature Extraction Sanity Check
     params_to_update = params_to_learn(model_resnet, feature_extract)
 
-    optimizer = optim.SGD(params_to_update, lr=0.001, momentum=0.9)
+    optimizer = optim.SGD(params_to_update, lr= learning_rate, momentum=0.9, weight_decay = weight_decay)
     criterion = nn.CrossEntropyLoss()
 
     ################# GPU ##################
