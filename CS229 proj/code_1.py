@@ -10,79 +10,56 @@ import time
 import copy
 import os
 import shutil
+import geopy
 
-def check_data():
-    dataset = 'eric_split_data'
-    for kind in os.listdir(dataset):
-        if kind == '.DS_Store': continue
-        kind_path = dataset+'/'+kind
-        sum_kind = 0
-        for country in os.listdir(kind_path):
-            if country == '.DS_Store': continue
-            f_country = kind_path+'/'+country
-            sum_kind += len(os.listdir(f_country))
-        print(f"{kind} data has {sum_kind} pics")
+### GEOGRAPHIC DISTANCE CALCULATION ###
+def calc_dist_matrix(normalize=True):
+    coord_data = 'world_country_and_usa_states_latitude_and_longitude_values.csv'
+    dataset = 'top20_split_data'
 
+    ### get country coordinates ###
+    my_data_str = np.genfromtxt(coord_data, delimiter=',', skip_header=1, dtype=str)
+    lats = [float(x) for x in my_data_str[:,1]]
+    longs = [float(x) for x in my_data_str[:,2]]
+    countries_with_coords = my_data_str[:,3]
+    coords = dict()
+    for i in range(len(countries_with_coords)):
+        coords[countries_with_coords[i]] = (lats[i],longs[i])
 
-# model training code 
-def debug_time(identifier,start):
-    print(f"part {identifier} at {time.time()-start}")
+    ### get list of countries from dataset ###
+    test_dir = os.listdir(dataset)[0]
+    if test_dir == '.DS_Store': test_dir = os.listdir(dataset)[1]
+    data_countries = os.listdir(dataset+'/'+test_dir)
+    if '.DS_Store' in data_countries: data_countries.remove('.DS_Store')
+    # print(f"data_countries: {data_countries}")
+    ### calculate distance matrix ###
+    n_countries = len(data_countries)
+    from geopy import distance
+    dist_matrix = np.zeros((n_countries,n_countries))
+    ### calculate matrix ###
+    for a,cunt_a in enumerate(data_countries):
+        for b,cunt_b in enumerate(data_countries):
+            cunt_a,cunt_b = cunt_a[4:],cunt_b[4:]  # remove prefix 'new_'
+            if coords.get(cunt_a) is None or coords.get(cunt_b) is None: continue
+            dist_matrix[a,b] = distance.great_circle(coords[cunt_a], coords[cunt_b]).miles
+    if not normalize: return dist_matrix
+    if np.max(dist_matrix) == 0: print(f"\n\n {dist_matrix} \n\n ERROR!! \n\n")
+    return dist_matrix / np.max(dist_matrix)  # normalize
+
+# compute loss_distance
+loss_dist_matrix = calc_dist_matrix()  # shape=(n_countries,n_countries)
+def compute_loss_dist(preds,labels,batch_size):
+    loss = 0
+    for i in range(batch_size):
+        loss += loss_dist_matrix[preds[i],labels[i]]
+    return loss
 
 def set_parameter_requires_grad(model, feature_extracting):
     if feature_extracting:
         for param in model.parameters():
             param.requires_grad = False
 
-def remove_dirs(file_path, directories_to_keep):
-    for entry in os.listdir(file_path):
-        # If the entry is a directory and it is not in the list of directories to keep
-        # print(f"entry is {entry} and directories_to_keep is {directories_to_keep}")
-        if os.path.isdir(entry) and entry not in directories_to_keep:
-
-            # Recursively delete the directory and all its contents
-            print(f"removing {entry} folder from {file_path} ")
-            shutil.rmtree(entry)
-
-
-def clean_directories(root_dir, selection_num):
-    num_top_subfolders = selection_num
-    train_dir = os.path.join(root_dir, 'train')
-
-    subfolder_counts = {}
-
-    # Iterate over the subfolders in the "train" directory
-    for subfolder in os.listdir(train_dir):
-        # Get the full path of the subfolder
-        subfolder_path = os.path.join(train_dir, subfolder)
-
-        # Check if the subfolder is a directory
-        if os.path.isdir(subfolder_path):
-            # Initialize the count of files in the subfolder to 0
-            subfolder_counts[subfolder] = 0
-
-            # Iterate over the files in the subfolder
-            for file in os.listdir(subfolder_path):
-                # Get the full path of the file
-                file_path = os.path.join(subfolder_path, file)
-
-                # Check if the file is a regular file
-                if os.path.isfile(file_path):
-                    # Increment the count of files in the subfolder
-                    subfolder_counts[subfolder] += 1
-
-    # Sort the subfolders by their counts of files
-    sorted_subfolders = sorted(subfolder_counts, key=subfolder_counts.get, reverse=True)
-
-    # Get the list of top subfolders
-    top_subfolders = sorted_subfolders[:num_top_subfolders]
-
-    for mode in ["train", "test", "val"]:
-        remove_dirs(os.path.join(root_dir, mode), top_subfolders)
-
-
 def load_data(data_path, model, feature_extract, input_size, batch_size):
-
-    
 
     data_transforms = {
         'train': transforms.Compose([
@@ -99,11 +76,8 @@ def load_data(data_path, model, feature_extract, input_size, batch_size):
         ]),
     }
 
-
     image_datasets = {x: datasets.ImageFolder(os.path.join(data_path, x), data_transforms[x]) for x in ['train', 'val']}
     
-
-    print(f"my batch size is {batch_size}")
     dataloaders_dict = {
         x: torch.utils.data.DataLoader(image_datasets[x], 
                                     batch_size=batch_size, 
@@ -113,7 +87,6 @@ def load_data(data_path, model, feature_extract, input_size, batch_size):
         for x in ['train', 'val']
     }
     return dataloaders_dict
-
 
 def params_to_learn(model, feature_extract):
     params_to_update = model.parameters()
@@ -134,12 +107,14 @@ def params_to_learn(model, feature_extract):
     print(f"num to update: {num}")
     return params_to_update
 
-def train_model(model, dataloaders, criterion, optimizer, num_epochs, device, is_inception=False):
+def train_model(model, dataloaders, criterion, optimizer, num_epochs, device, alpha, is_inception=False):
     since = time.time()
     val_acc_history = []
 
     best_model_wts = copy.deepcopy(model.state_dict())
     best_acc = 0.0
+
+    # loss_dist_matrix = dist_matrix()  # shape=(n_countries,n_countries)
 
     for epoch in range(num_epochs):
         print('Epoch {}/{}'.format(epoch, num_epochs - 1))
@@ -147,8 +122,6 @@ def train_model(model, dataloaders, criterion, optimizer, num_epochs, device, is
 
         # Each epoch has a training and validation phase
         for phase in ['train', 'val']:
-            start = time.time()
-            # debug_time(0,start)
             if phase == 'train':
                 model.train()  # Set model to training mode
             else:
@@ -158,67 +131,42 @@ def train_model(model, dataloaders, criterion, optimizer, num_epochs, device, is
             running_corrects = 0
             
             # Iterate over data.
-            # start_for = time.time()
-            start = time.time()
             count = 0
+            last_time = time.time()
+            print(f"normalize with: {len(dataloaders[phase].dataset)}")
             for inputs, labels in dataloaders[phase]:
-                # print(f"label values: {labels}, \n label size: {np.shape(labels)}")
-                # print(f"inputs size : {np.shape(inputs)}")
-                print(f"iter: {count}")
+                if count % 10 == 0: print(f"iter: {count}.     time for last iter: {time.time()-last_time}")
+                last_time = time.time()
                 count+=1
-                # debug_time(4,start)
-                # start = time.time()
-                # debug_time(1,start)
-                # end_for = time.time()
-                # print(f"{phase} for loop took {end_for - start_for} sec to complete")
-                # start_for = time.time()
                 inputs = inputs.to(device)
                 labels = labels.to(device)
-                
-                # print(labels)
 
                 # zero the parameter gradients
                 optimizer.zero_grad()
 
                 # forward
                 # track history if only in train
-                # start_with = time.time()
                 with torch.set_grad_enabled(phase == 'train'):
                     # Get model outputs and calculate loss
-                    # Special case for inception because in training it has an auxiliary output. In train
-                    #   mode we calculate the loss by summing the final output and the auxiliary output
-                    #   but in testing we only consider the final output.
-                    if is_inception and phase == 'train':
-                        # From https://discuss.pytorch.org/t/how-to-optimize-inception-model-with-auxiliary-classifiers/7958
-                        outputs, aux_outputs = model(inputs)
-                        loss1 = criterion(outputs, labels)
-                        loss2 = criterion(aux_outputs, labels)
-                        loss = loss1 + 0.4*loss2
-                    else:
-                        outputs = model(inputs)
-                        loss = criterion(outputs, labels)
-
+                    outputs = model(inputs)
+                    loss = criterion(outputs, labels)
                     _, preds = torch.max(outputs, 1)
+                    
+                    loss_dist = compute_loss_dist(preds, labels, inputs.size(0))
+                    #print(f"loss = {loss}.  loss_dist = {loss_dist}")
+                    loss += alpha * loss_dist
 
 
                     # backward + optimize only if in training phase
                     if phase == 'train':
                         loss.backward()
                         optimizer.step()
-                # end_with = time.time()
-                # print(f"with thing took {end_with - start_with}")
-                # debug_time(2,start)
                 # statistics
                 running_loss += loss.item() * inputs.size(0)
                 running_corrects += torch.sum(preds == labels.data)
-                
-                end = time.time()
-                #print(f"body run time: {end - start} sec")
-                # debug_time(3,start)
 
             epoch_loss = running_loss / len(dataloaders[phase].dataset)
             epoch_acc = running_corrects.float() / len(dataloaders[phase].dataset)
-            # debug_time(5,start)
             print('{} Loss: {:.4f} Acc: {:.4f}'.format(phase, epoch_loss, epoch_acc))
             
             # deep copy the model
@@ -227,7 +175,6 @@ def train_model(model, dataloaders, criterion, optimizer, num_epochs, device, is
                 best_model_wts = copy.deepcopy(model.state_dict())
             if phase == 'val':
                 val_acc_history.append(epoch_acc)
-            debug_time(6,start)
         print()
       
     time_elapsed = time.time() - since
@@ -244,24 +191,21 @@ def run():
     import ssl
     ssl._create_default_https_context = ssl._create_unverified_context
 
-
-    check_data()
     model_resnet = resnet50(weights=ResNet50_Weights.DEFAULT)
     weights_resnet = ResNet50_Weights.DEFAULT
     preprocess_resnet = weights_resnet.transforms() 
 
     model_names = ["resnet", "alexnet", "vgg", "squeezenet", "densenet", "inception"]
-    num_classes = 124 # CHECK
+    num_classes = 20 # CHECK
     # batch_sizes = [16, 32, 64, 128, 265]
     batch_size = 128
     num_epochs = 15
     feature_extract = True
+    alpha = .25
     # Resnet50 takes inputs of dim (224,224,3)
     input_size = 224
 
-
     set_parameter_requires_grad(model_resnet, feature_extract)
-
 
     num_resnet = model_resnet.fc.in_features
     model_resnet.fc = nn.Linear(num_resnet, num_classes)
@@ -273,29 +217,29 @@ def run():
     criterion = nn.CrossEntropyLoss()
 
     ################# GPU ##################
-    # device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    # print(f"device: {device}")
     device = torch.device("mps")
     model_resnet = model_resnet.to(device)
     ################# GPU ##################
 
-
     data_path = 'top20_split_data'
-
     data_loader = load_data(data_path, model_resnet, feature_extract, input_size, batch_size)
 
     # Train  model
-    model, hist = train_model(model_resnet, data_loader, criterion, optimizer, num_epochs, device)
+
+    # set by eric
+    num_epochs = 3
+    alphas = [.1,.25,.5,.75,.1]
+    histories = np.zeros((len(alphas),num_epochs))
+    for i,alpha in enumerate(alphas):
+        model, hist = train_model(model_resnet, data_loader, criterion, optimizer, num_epochs, device, alpha)
+        histories[i,:len(hist)]
+    print(f"final accuracies for alphas = {alphas}:\n {histories}")
+    # model, hist = train_model(model_resnet, data_loader, criterion, optimizer, num_epochs, device, alpha)
     
 
 if __name__ == '__main__':
-    # clean_directories(data_path, 75)
-    # freeze_support()
+    assert torch.backends.mps.is_available() == True
     run()
-    # path = 'eric_split_data'
-    # for mode in ["train", "val", "test"]:
-        # print(len(os.listdir(os.path.join(path, mode))))
-    print(torch.backends.mps.is_available())
 
 
 
