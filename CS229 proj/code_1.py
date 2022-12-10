@@ -15,6 +15,84 @@ import matplotlib.pyplot as plt
 import ssl
 import json
 from geopy import distance
+from sklearn.metrics import confusion_matrix
+import seaborn as sn
+import pandas as pd
+
+### Make Histogram ### 
+def make_histogram(data_path):
+    dict = {}
+    unsorted_countries = []
+    for country in os.listdir(data_path):
+        f_country = os.path.join(data_path, country)
+        unsorted_countries.append(country)
+        if os.path.isdir(f_country):
+            n_pics = len(os.listdir(f_country))
+            dict[n_pics] = country
+    counts = []
+    countries = []
+    for key in sorted(dict.keys(),reverse = True):
+        counts.append(key)
+        country_name = dict[key][4:]
+        # countries.append(dict[key])
+        countries.append(country_name)
+
+    f = plt.figure()
+    f.set_figwidth(40)
+    f.set_figheight(30)
+    plt.bar(range(len(countries)), counts)
+
+    plt.title("Top 20 countries with the most number of images")
+    plt.ylabel("No. of images")
+
+    plt.xticks(range(len(countries)), countries)
+    plt.xticks(rotation=60)
+
+    plt.show()
+
+
+def test_model(data_path, model):
+    #testing and confusion matrix
+
+    transform = transforms.Compose([
+            transforms.ToTensor(),
+            transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]) 
+        ])
+
+    images = datasets.ImageFolder(os.path.join(data_path, 'test'), transform) 
+
+    testloader = torch.utils.data.DataLoader(images, 
+                                    batch_size=128, 
+                                    shuffle = True, 
+                                    num_workers=4
+                                    ) 
+
+    unsorted_countries = testloader.dataset.classes
+
+    correct = 0
+    total = 0
+    y_pred = []
+    y_true = []
+    # since we're not training, we don't need to calculate the gradients for our outputs
+    with torch.no_grad():
+        for data in testloader:
+            images, labels = data
+            # calculate outputs by running images through the network
+            outputs = model(images)
+            y_pred.append(outputs)
+            y_true.append(labels)
+            # the class with the highest energy is what we choose as prediction
+            _, predicted = torch.max(outputs.data, 1)
+            total += labels.size(0)
+            correct += (predicted == labels).sum().item()
+
+    cf_matrix = confusion_matrix(y_true, y_pred)
+    df_cm = pd.DataFrame(cf_matrix/np.sum(cf_matrix) *10, index = [i for i in unsorted_countries],
+                        columns = [i for i in unsorted_countries])
+    plt.figure(figsize = (12,7))
+    sn.heatmap(df_cm, annot=True)
+    plt.savefig('output.png')
+
 
 ### GEOGRAPHIC DISTANCE CALCULATION ###
 def calc_dist_matrix(normalize=True):
@@ -127,10 +205,6 @@ def params_to_learn(model, feature_extract):
                 print("\t",name)
     return params_to_update
 
-def test_model(model, dataloaders, criterion, optimizer, num_epochs, device, is_inception=False):
-    model.eval()   # Set model to evaluate mode
-    print("test_model() called")
-    pass
 
 def train_model(model, dataloaders, criterion, optimizer, num_epochs, device, alpha):
     since = time.time()
@@ -199,9 +273,10 @@ def train_model(model, dataloaders, criterion, optimizer, num_epochs, device, al
                 train_acc_history.append(epoch_acc)
             if phase == 'val':
                 val_acc_history.append(epoch_acc)
-                if epoch > 0: make_graph(val_acc_history, train_acc_history, epoch)
-            
-      
+
+
+    make_graph(val_acc_history, train_acc_history, num_epochs)
+
     time_elapsed = time.time() - since
     print('Training complete in {:.0f}m {:.0f}s'.format(time_elapsed // 60, time_elapsed % 60))
     print('Best val Acc: {:4f}'.format(best_acc))
@@ -229,15 +304,15 @@ def make_graph(val_hist, train_hist, num_epochs):
     plt.ylabel("Validation Accuracy")
     print(f"about to plot")
     print(f"vhist: {np.shape(vhist)} thist: {np.shape(thist)}, num_epochs: {num_epochs}")
-    plt.plot(range(1,num_epochs+2),vhist,label="Validation Accuracy")
-    plt.plot(range(1,num_epochs+2),thist,label="Training Accuracy")
+    plt.plot(range(1,num_epochs+1),vhist,label="Validation Accuracy")
+    plt.plot(range(1,num_epochs+1),thist,label="Training Accuracy")
     plt.ylim((0,1.))
     plt.xticks(np.arange(1, num_epochs+1, 1.0))
     plt.legend()
     plt.savefig(os.path.join('plot.png'))
     # plt.show()
 
-def run_one_config(data_path, model, feature_extract, input_size, curr_hyper_params, device):
+def run_one_config(data_path, model, feature_extract, input_size, curr_hyper_params):
     batch_size, learning_rate, alpha, weight_decay = curr_hyper_params
     set_parameter_requires_grad(model, feature_extract)
     num_resnet = model.fc.in_features
@@ -248,12 +323,16 @@ def run_one_config(data_path, model, feature_extract, input_size, curr_hyper_par
     # Feature Extraction Sanity Check
     print(f"Feature Extraction Sanity Check: ")
     print(f"feature_extract: {feature_extract}")
-
     params_to_update = params_to_learn(model, feature_extract)
+
+    ########### Move Model to GPU #############
+    device = torch.device("mps")
+    model = model.to(device)
+
     optimizer = optim.Adam(params_to_update, lr=learning_rate, weight_decay=weight_decay)
     data_loader = load_data(data_path, model, feature_extract, input_size, batch_size)
 
-    # Train  model
+    ############ Train  Model ###########
     print(f"train_model() with batch_size: {batch_size}, learning_rate: {learning_rate}, alpha: {alpha}, weight_decay: {weight_decay}")
     best_val_acc, model = train_model(model, data_loader, criterion, optimizer, num_epochs, device, alpha)
     return best_val_acc, model
@@ -273,15 +352,12 @@ if __name__ == '__main__':
     weights_resnet = ResNet50_Weights.DEFAULT
     preprocess_resnet = weights_resnet.transforms() 
 
-    ################# GPU ##################
-    device = torch.device("mps")
-    model = model.to(device)
     
     ############ HYPER PARAMS ###########
     input_size = 224
     feature_extract = True
     num_classes = 20 # CHECK
-    num_epochs = 15
+    num_epochs = 1
     batch_sizes = [32, 264]
     learning_rates = [1, 1e-1, 1e-2, 1e-3, 1e-4, 1e-5, 1e-6]
     weight_decays = [1e-1, 1e-2, 1e-3, 1e-4, 1e-5, 1e-6]
@@ -292,8 +368,10 @@ if __name__ == '__main__':
     best_model_wts = copy.deepcopy(model.state_dict())
     best_hyper_params = None
 
-    ########### Hyper Params Search###########
-    search_iters = 30
+
+    ########### Hyper Params Search ###########
+
+    search_iters = 1
     for i in range(search_iters):
         # Randomly sample the hyper params
         batch_size = np.random.random_integers(batch_sizes[0], batch_sizes[1])
@@ -304,7 +382,7 @@ if __name__ == '__main__':
         curr_hyper_params = (batch_size, learning_rate, alpha, weight_decay)
 
         # Run complete training and validation with these hyperparams
-        val_acc, model = run_one_config(data_path, model, feature_extract, input_size, curr_hyper_params, device)
+        val_acc, model = run_one_config(data_path, model, feature_extract, input_size, curr_hyper_params)
         
         print(f"run_one_config completed. batch_size: {batch_size}, learning_rate: {learning_rate}, alpha: {alpha}, weight_decay: {weight_decay}, val_acc: {val_acc}")
 
@@ -324,7 +402,7 @@ if __name__ == '__main__':
 
 
     ########### Test Set Run ###########
-    test_model(data_path, model,)
+    test_model('top20_split_data', model)
 
     
     # # Process Dictionary
