@@ -278,9 +278,6 @@ def train_model(model, dataloaders, criterion, optimizer, num_epochs, device, al
             if phase == 'val':
                 val_acc_history.append(epoch_acc)
 
-
-    make_graph(val_acc_history, train_acc_history, num_epochs)
-
     time_elapsed = time.time() - since
     print('Training complete in {:.0f}m {:.0f}s'.format(time_elapsed // 60, time_elapsed % 60))
     print('Best val Acc: {:4f}'.format(best_acc))
@@ -288,7 +285,7 @@ def train_model(model, dataloaders, criterion, optimizer, num_epochs, device, al
     # load best model weights
     model.load_state_dict(best_model_wts)
     # return model, val_acc_history, train_acc_history
-    return best_acc, model
+    return best_acc, model, val_acc_history, train_acc_history
 
 
 def make_graph(val_hist, train_hist, num_epochs):
@@ -338,8 +335,8 @@ def run_one_config(data_path, model, feature_extract, input_size, curr_hyper_par
 
     ############ Train  Model ###########
     print(f"train_model() with batch_size: {batch_size}, learning_rate: {learning_rate}, alpha: {alpha}, weight_decay: {weight_decay}")
-    best_val_acc, model = train_model(model, data_loader, criterion, optimizer, num_epochs, device, alpha)
-    return best_val_acc, model
+    best_val_acc, model, val_acc_list, train_acc_list = train_model(model, data_loader, criterion, optimizer, num_epochs, device, alpha)
+    return best_val_acc, model, val_acc_list, train_acc_list
 
 
 if __name__ == '__main__':
@@ -361,7 +358,7 @@ if __name__ == '__main__':
     input_size = 224
     feature_extract = True
     num_classes = 20 # CHECK
-    num_epochs = 3
+    num_epochs = 2
     batch_sizes = [32, 264]
     learning_rates = [1, 1e-1, 1e-2, 1e-3, 1e-4, 1e-5, 1e-6]
     weight_decays = [1e-1, 1e-2, 1e-3, 1e-4, 1e-5, 1e-6]
@@ -371,11 +368,12 @@ if __name__ == '__main__':
     best_val_acc = 0
     best_model_wts = copy.deepcopy(model.state_dict())
     best_hyper_params = None
+    val_acc_list, train_acc_list = [], []
 
 
     ########### Hyper Params Search ###########
 
-    search_iters = 30
+    search_iters = 1
     for i in range(search_iters):
         # Randomly sample the hyper params
         batch_size = np.random.random_integers(batch_sizes[0], batch_sizes[1])
@@ -386,7 +384,7 @@ if __name__ == '__main__':
         curr_hyper_params = (batch_size, learning_rate, alpha, weight_decay)
 
         # Run complete training and validation with these hyperparams
-        val_acc, model = run_one_config(data_path, model, feature_extract, input_size, curr_hyper_params)
+        val_acc, model, v_list, t_list = run_one_config(data_path, model, feature_extract, input_size, curr_hyper_params)
         
         print(f"run_one_config completed. batch_size: {batch_size}, learning_rate: {learning_rate}, alpha: {alpha}, weight_decay: {weight_decay}, val_acc: {val_acc}")
 
@@ -394,6 +392,11 @@ if __name__ == '__main__':
             best_val_acc = val_acc
             best_model_wts = copy.deepcopy(model.state_dict())
             best_hyper_params = curr_hyper_params
+            val_acc_list = v_list
+            train_acc_list = t_list
+
+    make_graph(val_acc_list, train_acc_list, num_epochs)
+
 
 
     # Set the number of workers and the GPUs that the workers will use
