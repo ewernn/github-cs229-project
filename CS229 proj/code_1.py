@@ -135,7 +135,7 @@ def train_model(model, dataloaders, criterion, optimizer, num_epochs, device, al
             last_time = time.time()
             print(f"normalize with: {len(dataloaders[phase].dataset)}")
             for inputs, labels in dataloaders[phase]:
-                if count % 10 == 0: print(f"iter: {count}.     time for last iter: {time.time()-last_time}")
+                if count % 295 == 0: print(f"iter: {count}.     time for last iter: {time.time()-last_time}")
                 last_time = time.time()
                 count+=1
                 inputs = inputs.to(device)
@@ -182,10 +182,31 @@ def train_model(model, dataloaders, criterion, optimizer, num_epochs, device, al
     print('Best val Acc: {:4f}'.format(best_acc))
 
     # load best model weights
-    model.load_state_dict(best_model_wts)
+    #########################################
+    ######### UNCOMMENT LATER ###############
+    # model.load_state_dict(best_model_wts)
+    #########################################
     return model, val_acc_history
 
 
+def init_resnet():
+    import ssl
+    ssl._create_default_https_context = ssl._create_unverified_context
+    model_resnet = resnet50(weights=ResNet50_Weights.DEFAULT)
+    num_classes = 20 # CHECK
+    feature_extract = True
+
+    set_parameter_requires_grad(model_resnet, feature_extract)
+    num_resnet = model_resnet.fc.in_features
+    model_resnet.fc = nn.Linear(num_resnet, num_classes)
+
+    ################# GPU ##################
+    device = torch.device("mps")
+    model_resnet = model_resnet.to(device)
+    ################# GPU ##################
+
+    return model_resnet
+    
 
 def run():
     import ssl
@@ -227,12 +248,13 @@ def run():
     # Train  model
 
     # set by eric
-    num_epochs = 3
-    alphas = [.1,.25,.5,.75,.1]
+    num_epochs = 1
+    alphas = [0,.1,.25,.5,.75,1.25]
     histories = np.zeros((len(alphas),num_epochs))
     for i,alpha in enumerate(alphas):
         model, hist = train_model(model_resnet, data_loader, criterion, optimizer, num_epochs, device, alpha)
-        histories[i,:len(hist)]
+        model_reset = init_resnet()
+        # histories[i,:len(hist)] = hist
     print(f"final accuracies for alphas = {alphas}:\n {histories}")
     # model, hist = train_model(model_resnet, data_loader, criterion, optimizer, num_epochs, device, alpha)
     
