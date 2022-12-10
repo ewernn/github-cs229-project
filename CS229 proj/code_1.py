@@ -18,6 +18,8 @@ from geopy import distance
 from sklearn.metrics import confusion_matrix
 import seaborn as sn
 import pandas as pd
+import torch.multiprocessing as mp
+
 
 ### Make Histogram ### 
 def make_histogram(data_path):
@@ -73,10 +75,13 @@ def test_model(data_path, model):
     total = 0
     y_pred = []
     y_true = []
+
+    device = torch.device("mps")
     # since we're not training, we don't need to calculate the gradients for our outputs
     with torch.no_grad():
         for data in testloader:
             images, labels = data
+            images, labels = data.to(device), data.to(device)
             # calculate outputs by running images through the network
             outputs = model(images)
             y_pred.append(outputs)
@@ -160,7 +165,7 @@ def set_parameter_requires_grad(model, feature_extracting):
             param.requires_grad = False
 
 
-def load_data(data_path, model, feature_extract, input_size, batch_size):
+def load_data(data_path, model, feature_extract, input_size, b_size):
     data_transforms = {
         'train': transforms.Compose([
             transforms.RandomResizedCrop(input_size),
@@ -177,10 +182,9 @@ def load_data(data_path, model, feature_extract, input_size, batch_size):
 
     image_datasets = {x: datasets.ImageFolder(os.path.join(data_path, x), data_transforms[x]) for x in ['train', 'val']}
     
-    print(f"my batch size is {batch_size}")
     dataloaders_dict = {
         x: torch.utils.data.DataLoader(image_datasets[x], 
-                                    batch_size=128, 
+                                    batch_size=int(abs(b_size)), 
                                     shuffle = True, 
                                     num_workers=4
                                     ) 
@@ -357,7 +361,7 @@ if __name__ == '__main__':
     input_size = 224
     feature_extract = True
     num_classes = 20 # CHECK
-    num_epochs = 1
+    num_epochs = 3
     batch_sizes = [32, 264]
     learning_rates = [1, 1e-1, 1e-2, 1e-3, 1e-4, 1e-5, 1e-6]
     weight_decays = [1e-1, 1e-2, 1e-3, 1e-4, 1e-5, 1e-6]
@@ -371,7 +375,7 @@ if __name__ == '__main__':
 
     ########### Hyper Params Search ###########
 
-    search_iters = 1
+    search_iters = 30
     for i in range(search_iters):
         # Randomly sample the hyper params
         batch_size = np.random.random_integers(batch_sizes[0], batch_sizes[1])
@@ -390,6 +394,46 @@ if __name__ == '__main__':
             best_val_acc = val_acc
             best_model_wts = copy.deepcopy(model.state_dict())
             best_hyper_params = curr_hyper_params
+
+
+    # Set the number of workers and the GPUs that the workers will use
+    # num_workers = search_iters
+    # gpus = [0]
+
+    # # Define the function that will be run by the workers
+    # def run_one_config_worker(i, data_path, model, feature_extract, input_size, best_val_acc, best_model_wts, best_hyper_params):
+    #     # Randomly sample the hyper params
+    #     batch_size = np.random.random_integers(batch_sizes[0], batch_sizes[1])
+    #     learning_rate = np.random.choice(learning_rates)
+    #     alpha = np.random.uniform()
+    #     weight_decay = np.random.choice(weight_decays)
+        
+    #     curr_hyper_params = (batch_size, learning_rate, alpha, weight_decay)
+
+    #     # Run complete training and validation with these hyperparams
+    #     val_acc, model = run_one_config(data_path, model, feature_extract, input_size, curr_hyper_params)
+
+    #     # Update the shared variables
+    #     if val_acc > best_val_acc.value:
+    #         best_val_acc.value = val_acc
+    #         best_model_wts.value = copy.deepcopy(model.state_dict())
+    #         best_hyper_params.value = curr_hyper_params
+
+    # # Create shared variables for the best accuracy, model weights, and hyperparameters
+    # best_val_acc = mp.Value("d", 0.0)
+    # best_model_wts = mp.Value("d", 0.0)
+    # best_hyper_params = mp.Value("d", 0.0)
+
+    # # Spawn the worker processes
+    # mp.spawn(run_one_config_worker, 
+    #          nprocs=num_workers, 
+    #          args=(data_path, model, feature_extract, input_size, best_val_acc, best_model_wts, best_hyper_params), 
+    #          gpus=gpus)
+
+    # # Do something with the shared variables
+    # print(best_val_acc.value)
+    # print(best_model_wts.value)
+    # print(best_hyper_params.value)
     
     print(f"{search_iters} hyper param search iterations results:")
     print(f"best_val_acc: {best_val_acc}")
