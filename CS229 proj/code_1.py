@@ -450,6 +450,8 @@ if __name__ == '__main__':
 
     ########### Test Set Run ###########
     test_model('top20_split_data', model)
+    torch.save(model.state_dict(), "best_model_state_dict.pth")
+
 
     
     # # Process Dictionary
