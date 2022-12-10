@@ -1,4 +1,3 @@
-from PIL import Image
 import numpy as np
 import torch
 from torchvision import datasets, models, transforms
@@ -7,11 +6,57 @@ from torchvision.datasets import ImageFolder
 import torch.optim as optim
 from torch import nn
 from torch.utils.data import WeightedRandomSampler
+from PIL import Image
 import time
 import copy
 import os
 import shutil
 import matplotlib.pyplot as plt
+import ssl
+import json
+from geopy import distance
+
+### GEOGRAPHIC DISTANCE CALCULATION ###
+def calc_dist_matrix(normalize=True):
+    coord_data = 'world_country_and_usa_states_latitude_and_longitude_values.csv'
+    dataset = 'top20_split_data'
+
+    ### get country coordinates ###
+    my_data_str = np.genfromtxt(coord_data, delimiter=',', skip_header=1, dtype=str)
+    lats = [float(x) for x in my_data_str[:,1]]
+    longs = [float(x) for x in my_data_str[:,2]]
+    countries_with_coords = my_data_str[:,3]
+    coords = dict()
+    for i in range(len(countries_with_coords)):
+        coords[countries_with_coords[i]] = (lats[i],longs[i])
+
+    ### get list of countries from dataset ###
+    test_dir = os.listdir(dataset)[0]
+    if test_dir == '.DS_Store': test_dir = os.listdir(dataset)[1]
+    data_countries = os.listdir(dataset+'/'+test_dir)
+    if '.DS_Store' in data_countries: data_countries.remove('.DS_Store')
+    # print(f"data_countries: {data_countries}")
+    ### calculate distance matrix ###
+    n_countries = len(data_countries)
+    dist_matrix = np.zeros((n_countries,n_countries))
+    ### calculate matrix ###
+    for a,cunt_a in enumerate(data_countries):
+        for b,cunt_b in enumerate(data_countries):
+            cunt_a,cunt_b = cunt_a[4:],cunt_b[4:]  # remove prefix 'new_'
+            if coords.get(cunt_a) is None or coords.get(cunt_b) is None: continue
+            dist_matrix[a,b] = distance.great_circle(coords[cunt_a], coords[cunt_b]).miles
+    if not normalize: return dist_matrix
+    if np.max(dist_matrix) == 0: print(f"\n\n {dist_matrix} \n\n ERROR!! \n\n")
+    return dist_matrix / np.max(dist_matrix)  # normalize
+
+# compute loss_distance
+loss_dist_matrix = calc_dist_matrix()  # shape=(n_countries,n_countries)
+def compute_loss_dist(preds,labels,batch_size):
+    loss = 0
+    for i in range(batch_size):
+        loss += loss_dist_matrix[preds[i],labels[i]]
+    return loss
+
 
 
 def check_data():
@@ -36,53 +81,6 @@ def set_parameter_requires_grad(model, feature_extracting):
         for param in model.parameters():
             param.requires_grad = False
 
-def remove_dirs(file_path, directories_to_keep):
-    for entry in os.listdir(file_path):
-        # If the entry is a directory and it is not in the list of directories to keep
-        # print(f"entry is {entry} and directories_to_keep is {directories_to_keep}")
-        if os.path.isdir(entry) and entry not in directories_to_keep:
-
-            # Recursively delete the directory and all its contents
-            print(f"removing {entry} folder from {file_path} ")
-            shutil.rmtree(entry)
-
-
-def clean_directories(root_dir, selection_num):
-    num_top_subfolders = selection_num
-    train_dir = os.path.join(root_dir, 'train')
-
-    subfolder_counts = {}
-
-    # Iterate over the subfolders in the "train" directory
-    for subfolder in os.listdir(train_dir):
-        # Get the full path of the subfolder
-        subfolder_path = os.path.join(train_dir, subfolder)
-
-        # Check if the subfolder is a directory
-        if os.path.isdir(subfolder_path):
-            # Initialize the count of files in the subfolder to 0
-            subfolder_counts[subfolder] = 0
-
-            # Iterate over the files in the subfolder
-            for file in os.listdir(subfolder_path):
-                # Get the full path of the file
-                file_path = os.path.join(subfolder_path, file)
-
-                # Check if the file is a regular file
-                if os.path.isfile(file_path):
-                    # Increment the count of files in the subfolder
-                    subfolder_counts[subfolder] += 1
-
-    # Sort the subfolders by their counts of files
-    sorted_subfolders = sorted(subfolder_counts, key=subfolder_counts.get, reverse=True)
-
-    # Get the list of top subfolders
-    top_subfolders = sorted_subfolders[:num_top_subfolders]
-
-    for mode in ["train", "test", "val"]:
-        remove_dirs(os.path.join(root_dir, mode), top_subfolders)
-
-
 
 def load_data(data_path, model, feature_extract, input_size, batch_size):
     data_transforms = {
@@ -99,31 +97,18 @@ def load_data(data_path, model, feature_extract, input_size, batch_size):
         ]),
     }
 
-
-    train_dir = os.path.join(data_path, 'train')
-    weight = []
-    for country in os.listdir(train_dir):
-        new_dir = os.path.join(train_dir, country)
-        weight.append(len(os.listdir(new_dir)))
-    weight = 1. / weight
-    samples_weight = np.array(weight)
-    samples_weight = torch.from_numpy(samples_weight)
-    sampler = WeightedRandomSampler(samples_weight.type('torch.DoubleTensor'), len(samples_weight))
-
     image_datasets = {x: datasets.ImageFolder(os.path.join(data_path, x), data_transforms[x]) for x in ['train', 'val']}
     
-
     print(f"my batch size is {batch_size}")
     dataloaders_dict = {
         x: torch.utils.data.DataLoader(image_datasets[x], 
-                                    batch_size=batch_size, 
-                                    sampler = sampler, 
+                                    batch_size=128, 
+                                    shuffle = True, 
                                     num_workers=4
                                     ) 
         for x in ['train', 'val']
     }
     return dataloaders_dict
-
 
 def params_to_learn(model, feature_extract):
     params_to_update = model.parameters()
@@ -140,11 +125,14 @@ def params_to_learn(model, feature_extract):
         for name,param in model.named_parameters():
             if param.requires_grad == True:
                 print("\t",name)
-
-    print(f"num to update: {num}")
     return params_to_update
 
-def train_model(model, dataloaders, criterion, optimizer, num_epochs, device, is_inception=False):
+def test_model(model, dataloaders, criterion, optimizer, num_epochs, device, is_inception=False):
+    model.eval()   # Set model to evaluate mode
+    print("test_model() called")
+    pass
+
+def train_model(model, dataloaders, criterion, optimizer, num_epochs, device, alpha):
     since = time.time()
     val_acc_history = []
     train_acc_history = []
@@ -179,33 +167,23 @@ def train_model(model, dataloaders, criterion, optimizer, num_epochs, device, is
                 # forward
                 with torch.set_grad_enabled(phase == 'train'):
                     # Get model outputs and calculate loss
-                    # Special case for inception because in training it has an auxiliary output. In train
-                    #   mode we calculate the loss by summing the final output and the auxiliary output
-                    #   but in testing we only consider the final output.
-                    if is_inception and phase == 'train':
-                        # From https://discuss.pytorch.org/t/how-to-optimize-inception-model-with-auxiliary-classifiers/7958
-                        outputs, aux_outputs = model(inputs)
-                        loss1 = criterion(outputs, labels)
-                        loss2 = criterion(aux_outputs, labels)
-                        loss = loss1 + 0.4*loss2
-                    else:
-                        outputs = model(inputs)
-                        loss = criterion(outputs, labels)
+                    outputs = model(inputs)
+                    loss = criterion(outputs, labels)
 
                     _, preds = torch.max(outputs, 1)
 
+                    # Custom loss function
+                    loss_dist = compute_loss_dist(preds, labels, inputs.size(0))
+                    loss += alpha * loss_dist
 
-                    # backward + optimize only if in training phase
+                    # Backward + Optimize only if in training phase
                     if phase == 'train':
                         loss.backward()
                         optimizer.step()
                 # statistics
                 running_loss += loss.item() * inputs.size(0)
                 running_corrects += torch.sum(preds == labels.data)
-                
-                end = time.time()
-                #print(f"body run time: {end - start} sec")
-                # debug_time(3,start)
+
 
             epoch_loss = running_loss / len(dataloaders[phase].dataset)
             epoch_acc = running_corrects.float() / len(dataloaders[phase].dataset)
@@ -223,8 +201,6 @@ def train_model(model, dataloaders, criterion, optimizer, num_epochs, device, is
                 val_acc_history.append(epoch_acc)
                 if epoch > 0: make_graph(val_acc_history, train_acc_history, epoch)
             
-
-            # debug_time(6,start)
       
     time_elapsed = time.time() - since
     print('Training complete in {:.0f}m {:.0f}s'.format(time_elapsed // 60, time_elapsed % 60))
@@ -232,7 +208,8 @@ def train_model(model, dataloaders, criterion, optimizer, num_epochs, device, is
 
     # load best model weights
     model.load_state_dict(best_model_wts)
-    return model, val_acc_history, train_acc_history
+    # return model, val_acc_history, train_acc_history
+    return best_acc, model
 
 
 def make_graph(val_hist, train_hist, num_epochs):
@@ -260,75 +237,104 @@ def make_graph(val_hist, train_hist, num_epochs):
     plt.savefig(os.path.join('plot.png'))
     # plt.show()
 
-def run():
-    import ssl
+def run_one_config(data_path, model, feature_extract, input_size, curr_hyper_params, device):
+    batch_size, learning_rate, alpha, weight_decay = curr_hyper_params
+    set_parameter_requires_grad(model, feature_extract)
+    num_resnet = model.fc.in_features
+    model.fc = nn.Linear(num_resnet, num_classes)
+
+    criterion = nn.CrossEntropyLoss()
+
+    # Feature Extraction Sanity Check
+    print(f"Feature Extraction Sanity Check: ")
+    print(f"feature_extract: {feature_extract}")
+
+    params_to_update = params_to_learn(model, feature_extract)
+    optimizer = optim.Adam(params_to_update, lr=learning_rate, weight_decay=weight_decay)
+    data_loader = load_data(data_path, model, feature_extract, input_size, batch_size)
+
+    # Train  model
+    print(f"train_model() with batch_size: {batch_size}, learning_rate: {learning_rate}, alpha: {alpha}, weight_decay: {weight_decay}")
+    best_val_acc, model = train_model(model, data_loader, criterion, optimizer, num_epochs, device, alpha)
+    return best_val_acc, model
+
+
+if __name__ == '__main__':
+    assert torch.backends.mps.is_available() == True
     ssl._create_default_https_context = ssl._create_unverified_context
 
-
+    # LOAD DATA
+    data_path = 'top20_split_data'
     check_data()
-    model_resnet = resnet50(weights=ResNet50_Weights.DEFAULT)
+
+    # Model selection 
+    # Resnet50 takes inputs of dim (224,224,3)
+    model = resnet50(weights=ResNet50_Weights.DEFAULT)
     weights_resnet = ResNet50_Weights.DEFAULT
     preprocess_resnet = weights_resnet.transforms() 
 
-    num_classes = 20 # CHECK
-    
-    batch_sizes = [16, 264]
-    batch_size = np.random.random_integers(batch_sizes[0], batch_sizes[1])
-
-    learning_rates = [1, 1e-1, 1e-2, 1e-3, 1e-4, 1e-5, 1e-6]
-    learning_rate = np.random.choice(learning_rates)
-
-    alpha = np.random.uniform()
-
-    weight_decays = [1e-1, 1e-2, 1e-3, 1e-4, 1e-5, 1e-6]
-    weight_decay = np.random.choice(weight_decays)
-
-    num_epochs = 15
-
-    feature_extract = True
-    # Resnet50 takes inputs of dim (224,224,3)
-    input_size = 224
-
-
-    set_parameter_requires_grad(model_resnet, feature_extract)
-
-
-    num_resnet = model_resnet.fc.in_features
-    model_resnet.fc = nn.Linear(num_resnet, num_classes)
-
-    # Feature Extraction Sanity Check
-    params_to_update = params_to_learn(model_resnet, feature_extract)
-
-    optimizer = optim.SGD(params_to_update, lr= learning_rate, momentum=0.9, weight_decay = weight_decay)
-    criterion = nn.CrossEntropyLoss()
-
     ################# GPU ##################
-    # device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    # print(f"device: {device}")
     device = torch.device("mps")
-    model_resnet = model_resnet.to(device)
-    ################# GPU ##################
-
-
-    data_path = 'top20_split_data'
-
-    data_loader = load_data(data_path, model_resnet, feature_extract, input_size, batch_size)
-
-    # Train  model
-    model, val_hist, train_hist = train_model(model_resnet, data_loader, criterion, optimizer, num_epochs, device)
-
-    # make_graph(val_hist, train_hist, num_epochs)
+    model = model.to(device)
     
+    ############ HYPER PARAMS ###########
+    input_size = 224
+    feature_extract = True
+    num_classes = 20 # CHECK
+    num_epochs = 15
+    batch_sizes = [32, 264]
+    learning_rates = [1, 1e-1, 1e-2, 1e-3, 1e-4, 1e-5, 1e-6]
+    weight_decays = [1e-1, 1e-2, 1e-3, 1e-4, 1e-5, 1e-6]
 
-if __name__ == '__main__':
-    # clean_directories(data_path, 75)
-    # freeze_support()
-    run()
-    # path = 'eric_split_data'
-    # for mode in ["train", "val", "test"]:
-        # print(len(os.listdir(os.path.join(path, mode))))
-    print(torch.backends.mps.is_available())
+    hyper_params_performance = {}
 
+    best_val_acc = 0
+    best_model_wts = copy.deepcopy(model.state_dict())
+    best_hyper_params = None
+
+    ########### Hyper Params Search###########
+    search_iters = 30
+    for i in range(search_iters):
+        # Randomly sample the hyper params
+        batch_size = np.random.random_integers(batch_sizes[0], batch_sizes[1])
+        learning_rate = np.random.choice(learning_rates)
+        alpha = np.random.uniform()
+        weight_decay = np.random.choice(weight_decays)
+        
+        curr_hyper_params = (batch_size, learning_rate, alpha, weight_decay)
+
+        # Run complete training and validation with these hyperparams
+        val_acc, model = run_one_config(data_path, model, feature_extract, input_size, curr_hyper_params, device)
+        
+        print(f"run_one_config completed. batch_size: {batch_size}, learning_rate: {learning_rate}, alpha: {alpha}, weight_decay: {weight_decay}, val_acc: {val_acc}")
+
+        if val_acc > best_val_acc:
+            best_val_acc = val_acc
+            best_model_wts = copy.deepcopy(model.state_dict())
+            best_hyper_params = curr_hyper_params
+    
+    print(f"{search_iters} hyper param search iterations results:")
+    print(f"best_val_acc: {best_val_acc}")
+    print(f"best_hyper_params: {best_hyper_params}")
+
+    # load in the best weight from all 30 hyper params iterations 
+    model.load_state_dict(best_model_wts)
+
+    print(f"Running best model ({best_val_acc}) on test set...")
+
+
+    ########### Test Set Run ###########
+    test_model(data_path, model,)
+
+    
+    # # Process Dictionary
+    # sorted_dict = sorted(hyper_params_performance.items(), key=lambda item: item[1], reverse=True)
+    # print(sorted_dict)
+    # json_string = json.dumps(sorted_dict)
+    # # Write the JSON string to a file
+    # with open("hyper_params_performance.json", "w") as f:
+    #     f.write(json_string)
+    
 
 
 
