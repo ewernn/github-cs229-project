@@ -77,7 +77,7 @@ def test_model(data_path, model):
     y_true = None
     flag = True
 
-    device = torch.device("mps")
+    device = torch.device("cuda")
     # since we're not training, we don't need to calculate the gradients for our outputs
     with torch.no_grad():
         for data in testloader:
@@ -339,7 +339,7 @@ def run_one_config(data_path, model, feature_extract, input_size, curr_hyper_par
     params_to_update = params_to_learn(model, feature_extract)
 
     ########### Move Model to GPU #############
-    device = torch.device("mps")
+    device = torch.device("cuda")
     model = model.to(device)
 
     optimizer = optim.Adam(params_to_update, lr=learning_rate, weight_decay=weight_decay)
@@ -352,7 +352,7 @@ def run_one_config(data_path, model, feature_extract, input_size, curr_hyper_par
 
 
 if __name__ == '__main__':
-    assert torch.backends.mps.is_available() == True
+    assert torch.cuda.is_available() == True
     ssl._create_default_https_context = ssl._create_unverified_context
 
     # LOAD DATA
@@ -363,6 +363,9 @@ if __name__ == '__main__':
     model = resnet50(weights=ResNet50_Weights.DEFAULT)
     weights_resnet = ResNet50_Weights.DEFAULT
     preprocess_resnet = weights_resnet.transforms() 
+
+    print(model)
+    assert False
 
     
     ############ HYPER PARAMS ###########
@@ -463,11 +466,6 @@ if __name__ == '__main__':
     model.load_state_dict(best_model_wts)
 
     print(f"Running best model ({best_val_acc}) on test set...")
-
-    # ########### JUST FOR TEST #############
-    # device = torch.device("mps")
-    # model = model.to(device)
-
 
     ########### Test Set Run ###########
     test_model('top20_split_data', model)
