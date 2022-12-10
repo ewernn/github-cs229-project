@@ -19,6 +19,7 @@ from sklearn.metrics import confusion_matrix
 import seaborn as sn
 import pandas as pd
 import torch.multiprocessing as mp
+from torch.nn.functional import softmax
 
 
 ### Make Histogram ### 
@@ -77,7 +78,10 @@ def test_model(data_path, model):
     y_true = None
     flag = True
 
-    device = torch.device("cuda")
+    def print_shape(a, name):
+        print(f"{name} shape: {np.shape(a)}")
+
+    device = torch.device("mps")
     # since we're not training, we don't need to calculate the gradients for our outputs
     with torch.no_grad():
         for data in testloader:
@@ -86,25 +90,27 @@ def test_model(data_path, model):
             # calculate outputs by running images through the network
             outputs = model(images)
             outputs = outputs.to("cpu")
-            # print(f"outputs shape: {np.shape(outputs.numpy())}")
 
-            # y_pred.append(outputs)
+            #these are logits, convert this to softmax:
+            softmax_output = softmax(outputs, dim=1)
+
+            #grab classes
+            predicted_classes = torch.argmax(softmax_output, dim=1)
+            pred = predicted_classes.numpy()
             if flag:
-                y_pred = outputs.numpy()
+                y_pred = pred
                 y_true = labels.numpy()
                 flag = False
             else: 
-                y_pred = np.concatenate([y_pred, outputs.numpy()])
+                y_pred = np.concatenate([y_pred, pred])
                 y_true = np.concatenate([y_true, labels.numpy()])
-
-            # y_true.append(labels)
             
             # the class with the highest energy is what we choose as prediction
-            _, predicted = torch.max(outputs.data, 1)
-            total += labels.size(0)
-            correct += (predicted == labels).sum().item()
+            # _, predicted = torch.max(outputs.data, 1)
+            # total += labels.size(0)
+            # correct += (predicted == labels).sum().item()
 
-    cf_matrix = confusion_matrix(y_true, y_pred)
+    cf_matrix = confusion_matrix(y_pred, y_true)
     df_cm = pd.DataFrame(cf_matrix/np.sum(cf_matrix) *10, index = [i for i in unsorted_countries],
                         columns = [i for i in unsorted_countries])
     plt.figure(figsize = (12,7))
@@ -233,7 +239,7 @@ def train_model(model, dataloaders, criterion, optimizer, num_epochs, device, al
 
     for epoch in range(num_epochs):
         print('Epoch {}/{}'.format(epoch, num_epochs - 1))
-        #print('-' * 10)
+        print('-' * 10)
 
         # Each epoch has a training and validation phase
         for phase in ['train', 'val']:
@@ -280,6 +286,7 @@ def train_model(model, dataloaders, criterion, optimizer, num_epochs, device, al
             epoch_acc = running_corrects.float() / len(dataloaders[phase].dataset)
             # debug_time(5,start)
             print('{} Loss: {:.4f} Acc: {:.4f}'.format(phase, epoch_loss, epoch_acc))
+            print()
             
             # deep copy the model
             if phase == 'val' and epoch_acc > best_acc:
@@ -339,7 +346,7 @@ def run_one_config(data_path, model, feature_extract, input_size, curr_hyper_par
     params_to_update = params_to_learn(model, feature_extract)
 
     ########### Move Model to GPU #############
-    device = torch.device("cuda")
+    device = torch.device("mps")
     model = model.to(device)
 
     optimizer = optim.Adam(params_to_update, lr=learning_rate, weight_decay=weight_decay)
@@ -352,23 +359,25 @@ def run_one_config(data_path, model, feature_extract, input_size, curr_hyper_par
 
 
 if __name__ == '__main__':
-    assert torch.cuda.is_available() == True
+    # assert torch.cuda.is_available() == True
     ssl._create_default_https_context = ssl._create_unverified_context
 
     # LOAD DATA
     data_path = 'top20_split_data'
     check_data()
+
     # Model selection 
     # Resnet50 takes inputs of dim (224,224,3)
     model = resnet50(weights=ResNet50_Weights.DEFAULT)
     weights_resnet = ResNet50_Weights.DEFAULT
     preprocess_resnet = weights_resnet.transforms() 
+
     
     ############ HYPER PARAMS ###########
     input_size = 224
     feature_extract = True
     num_classes = 20 # CHECK
-    num_epochs = 5
+    num_epochs = 12
     batch_sizes = [32, 264]
     learning_rates = [1, 1e-1, 1e-2, 1e-3, 1e-4, 1e-5, 1e-6]
     weight_decays = [1e-1, 1e-2, 1e-3, 1e-4, 1e-5, 1e-6]
@@ -383,7 +392,7 @@ if __name__ == '__main__':
 
     ########### Hyper Params Search ###########
 
-    search_iters = 20
+    search_iters = 0
     for i in range(search_iters):
         # Randomly sample the hyper params
         batch_size = np.random.random_integers(batch_sizes[0], batch_sizes[1])
@@ -396,7 +405,7 @@ if __name__ == '__main__':
         weight_decays = [1e-4, 1e-5, 1e-6]
         alpha = np.random.uniform(.7,2)
         batch_size = np.random.random_integers(140, 260)
-
+        
         curr_hyper_params = (batch_size, learning_rate, alpha, weight_decay)
 
         # Run complete training and validation with these hyperparams
@@ -411,7 +420,7 @@ if __name__ == '__main__':
             val_acc_list = v_list
             train_acc_list = t_list
 
-    make_graph(val_acc_list, train_acc_list, num_epochs)
+    # make_graph(val_acc_list, train_acc_list, num_epochs)
 
 
 
@@ -450,9 +459,9 @@ if __name__ == '__main__':
     #          gpus=gpus)
 
     # Do something with the shared variables
-    print(best_val_acc.value)
-    print(best_model_wts.value)
-    print(best_hyper_params.value)
+    # print(best_val_acc.value)
+    # print(best_model_wts.value)
+    # print(best_hyper_params.value)
     
     print(f"{search_iters} hyper param search iterations results:")
     print(f"best_val_acc: {best_val_acc}")
@@ -462,6 +471,17 @@ if __name__ == '__main__':
     model.load_state_dict(best_model_wts)
 
     print(f"Running best model ({best_val_acc}) on test set...")
+
+    ############ JUST FOR TEST #############
+    set_parameter_requires_grad(model, feature_extract)
+    num_resnet = model.fc.in_features
+    model.fc = nn.Linear(num_resnet, num_classes)
+    device = torch.device("mps")
+    model = model.to(device)
+    ############ JUST FOR TEST #############
+
+
+
 
     ########### Test Set Run ###########
     test_model('top20_split_data', model)
