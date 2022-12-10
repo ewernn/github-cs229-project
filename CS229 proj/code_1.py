@@ -363,10 +363,6 @@ if __name__ == '__main__':
     model = resnet50(weights=ResNet50_Weights.DEFAULT)
     weights_resnet = ResNet50_Weights.DEFAULT
     preprocess_resnet = weights_resnet.transforms() 
-
-    print(model)
-    assert False
-
     
     ############ HYPER PARAMS ###########
     input_size = 224
