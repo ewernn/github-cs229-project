@@ -233,7 +233,7 @@ def train_model(model, dataloaders, criterion, optimizer, num_epochs, device, al
 
     for epoch in range(num_epochs):
         print('Epoch {}/{}'.format(epoch, num_epochs - 1))
-        print('-' * 10)
+        #print('-' * 10)
 
         # Each epoch has a training and validation phase
         for phase in ['train', 'val']:
@@ -280,7 +280,6 @@ def train_model(model, dataloaders, criterion, optimizer, num_epochs, device, al
             epoch_acc = running_corrects.float() / len(dataloaders[phase].dataset)
             # debug_time(5,start)
             print('{} Loss: {:.4f} Acc: {:.4f}'.format(phase, epoch_loss, epoch_acc))
-            print()
             
             # deep copy the model
             if phase == 'val' and epoch_acc > best_acc:
@@ -359,7 +358,6 @@ if __name__ == '__main__':
     # LOAD DATA
     data_path = 'top20_split_data'
     check_data()
-
     # Model selection 
     # Resnet50 takes inputs of dim (224,224,3)
     model = resnet50(weights=ResNet50_Weights.DEFAULT)
@@ -371,7 +369,7 @@ if __name__ == '__main__':
     input_size = 224
     feature_extract = True
     num_classes = 20 # CHECK
-    num_epochs = 12
+    num_epochs = 5
     batch_sizes = [32, 264]
     learning_rates = [1, 1e-1, 1e-2, 1e-3, 1e-4, 1e-5, 1e-6]
     weight_decays = [1e-1, 1e-2, 1e-3, 1e-4, 1e-5, 1e-6]
@@ -386,14 +384,20 @@ if __name__ == '__main__':
 
     ########### Hyper Params Search ###########
 
-    search_iters = 15
+    search_iters = 20
     for i in range(search_iters):
         # Randomly sample the hyper params
         batch_size = np.random.random_integers(batch_sizes[0], batch_sizes[1])
         learning_rate = np.random.choice(learning_rates)
         alpha = np.random.uniform()
         weight_decay = np.random.choice(weight_decays)
-        
+
+        #hardcode testing
+        learning_rate = .001
+        weight_decays = [1e-4, 1e-5, 1e-6]
+        alpha = np.random.uniform(.7,2)
+        batch_size = np.random.random_integers(140, 260)
+
         curr_hyper_params = (batch_size, learning_rate, alpha, weight_decay)
 
         # Run complete training and validation with these hyperparams
@@ -466,7 +470,7 @@ if __name__ == '__main__':
 
 
     ########### Test Set Run ###########
-    # test_model('top20_split_data', model)
+    test_model('top20_split_data', model)
     torch.save(model.state_dict(), "best_model_state_dict.pth")
 
 
