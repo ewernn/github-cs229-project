@@ -73,19 +73,32 @@ def test_model(data_path, model):
 
     correct = 0
     total = 0
-    y_pred = []
-    y_true = []
+    y_pred = None
+    y_true = None
+    flag = True
 
     device = torch.device("mps")
     # since we're not training, we don't need to calculate the gradients for our outputs
     with torch.no_grad():
         for data in testloader:
             images, labels = data
-            images, labels = data.to(device), data.to(device)
+            images = images.to(device)
             # calculate outputs by running images through the network
             outputs = model(images)
-            y_pred.append(outputs)
-            y_true.append(labels)
+            outputs = outputs.to("cpu")
+            # print(f"outputs shape: {np.shape(outputs.numpy())}")
+
+            # y_pred.append(outputs)
+            if flag:
+                y_pred = outputs.numpy()
+                y_true = labels.numpy()
+                flag = False
+            else: 
+                y_pred = np.concatenate([y_pred, outputs.numpy()])
+                y_true = np.concatenate([y_true, labels.numpy()])
+
+            # y_true.append(labels)
+            
             # the class with the highest energy is what we choose as prediction
             _, predicted = torch.max(outputs.data, 1)
             total += labels.size(0)
@@ -358,7 +371,7 @@ if __name__ == '__main__':
     input_size = 224
     feature_extract = True
     num_classes = 20 # CHECK
-    num_epochs = 2
+    num_epochs = 12
     batch_sizes = [32, 264]
     learning_rates = [1, 1e-1, 1e-2, 1e-3, 1e-4, 1e-5, 1e-6]
     weight_decays = [1e-1, 1e-2, 1e-3, 1e-4, 1e-5, 1e-6]
@@ -373,7 +386,7 @@ if __name__ == '__main__':
 
     ########### Hyper Params Search ###########
 
-    search_iters = 1
+    search_iters = 15
     for i in range(search_iters):
         # Randomly sample the hyper params
         batch_size = np.random.random_integers(batch_sizes[0], batch_sizes[1])
@@ -433,10 +446,10 @@ if __name__ == '__main__':
     #          args=(data_path, model, feature_extract, input_size, best_val_acc, best_model_wts, best_hyper_params), 
     #          gpus=gpus)
 
-    # # Do something with the shared variables
-    # print(best_val_acc.value)
-    # print(best_model_wts.value)
-    # print(best_hyper_params.value)
+    # Do something with the shared variables
+    print(best_val_acc.value)
+    print(best_model_wts.value)
+    print(best_hyper_params.value)
     
     print(f"{search_iters} hyper param search iterations results:")
     print(f"best_val_acc: {best_val_acc}")
@@ -447,9 +460,13 @@ if __name__ == '__main__':
 
     print(f"Running best model ({best_val_acc}) on test set...")
 
+    # ########### JUST FOR TEST #############
+    # device = torch.device("mps")
+    # model = model.to(device)
+
 
     ########### Test Set Run ###########
-    test_model('top20_split_data', model)
+    # test_model('top20_split_data', model)
     torch.save(model.state_dict(), "best_model_state_dict.pth")
 
 
