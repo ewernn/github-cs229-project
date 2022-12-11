@@ -105,17 +105,19 @@ def test_model(data_path, model):
             else: 
                 y_pred = np.concatenate([y_pred, pred])
                 y_true = np.concatenate([y_true, labels.numpy()])
-            if i: 
-                print(f"labels: \n{labels} \n\n pred: \n{pred}")
-                print(f"correct_iter = {np.sum(pred == labels)}")
-            i=1
             # the class with the highest energy is what we choose as prediction
             # _, predicted = torch.max(outputs.data, 1)
-            labels = np.array(labels)
+            #labels = np.ndarray(labels)
             total += labels.size(0)
             # print_shape(pred, "pred")
             # print_shape(labels, "labels")
-
+            pred[0]=1
+            labels[0]=1
+            if i==0: 
+                print(f"---------- batch_size_test = {labels.size(0)} -------------")
+                print(f"labels: \n{labels} \n\n pred: \n{pred}")
+                print(f"correct_iter = {np.sum(pred == labels)}")
+            i=1
             correct += np.sum(pred == labels)  # (pred == labels).sum().item()
     total = len(testloader.dataset)
     print(f"percent correct on the test set: {correct / total}")
