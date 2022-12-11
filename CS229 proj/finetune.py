@@ -107,15 +107,16 @@ def test_model(data_path, model):
             
             # the class with the highest energy is what we choose as prediction
             # _, predicted = torch.max(outputs.data, 1)
-            # total += labels.size(0)
-            # correct += (predicted == labels).sum().item()
+            total += labels.size(0)
+            correct += (pred == labels).sum().item()
+    print(f"percent correct on the test set: {correct / total}")
 
     cf_matrix = confusion_matrix(y_true, y_pred)
     df_cm = pd.DataFrame(cf_matrix/np.sum(cf_matrix) *10, index = [i for i in unsorted_countries],
                         columns = [i for i in unsorted_countries])
     plt.figure(figsize = (12,7))
     sn.heatmap(df_cm, annot=True)
-    plt.savefig('output.png')
+    plt.savefig('confusion_matrix.png')
 
 
 ### GEOGRAPHIC DISTANCE CALCULATION ###
@@ -331,7 +332,7 @@ def make_graph(val_hist, train_hist, num_epochs):
     plt.ylim((0,1.))
     plt.xticks(np.arange(1, num_epochs+1, 1.0))
     plt.legend()
-    plt.savefig(os.path.join('plot.png'))
+    plt.savefig(os.path.join('acc_history.png'))
     # plt.show()
 
 def run_one_config(data_path, model, feature_extract, input_size, curr_hyper_params):
@@ -382,7 +383,7 @@ if __name__ == '__main__':
     input_size = 224
     feature_extract = True
     num_classes = 20 # CHECK
-    num_epochs = 1
+    num_epochs = 2
     batch_sizes = [32, 264]
     learning_rates = [1, 1e-1, 1e-2, 1e-3, 1e-4, 1e-5, 1e-6]
     weight_decays = [1e-1, 1e-2, 1e-3, 1e-4, 1e-5, 1e-6]
