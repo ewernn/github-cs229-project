@@ -496,7 +496,7 @@ if __name__ == '__main__':
     PATH_best_wts = "best_model_state_dict.pth"
     
     num_classes = 20
-    n_epochs = 20
+    n_epochs = 10
     search_iters = 1
 
     num_resnet = model.fc.in_features
