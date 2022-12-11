@@ -84,7 +84,6 @@ def test_model(data_path, model):
     device = torch.device("cuda")
     # since we're not training, we don't need to calculate the gradients for our outputs
     with torch.no_grad():
-        i=0
         for data in testloader:
             images, labels = data
             images = images.to(device)
@@ -113,16 +112,6 @@ def test_model(data_path, model):
             # print_shape(labels, "labels")
             pred = np.array(pred, dtype=np.float64)
             labels = np.array(labels, dtype=np.float64)
-            pred[0]=1
-            if i==0:
-                print('-----')
-                print(np.shape(labels))
-            labels[0]=1
-            if i==0:
-                print(f"---------- batch_size_test = {labels.shape[0]} -------------")
-                print(f"labels: \n{labels} \n\n pred: \n{pred}")
-                print(f"correct_iter = {np.sum(pred == labels)}")
-            i=1
             correct += np.sum(pred == labels)  # (pred == labels).sum().item()
     total = len(testloader.dataset)
     print(f"percent correct on the test set: {correct / total}")
@@ -352,7 +341,7 @@ def make_graph(val_hist, train_hist, num_epochs):
     plt.savefig(os.path.join('acc_history.png'))
     # plt.show()
 
-def run_one_config(data_path, model, feature_extract, input_size, curr_hyper_params):
+def run_one_config(data_path, model, feature_extract, input_size, curr_hyper_params, num_classes):
     batch_size, learning_rate, alpha, weight_decay = curr_hyper_params
 
     #change
@@ -381,12 +370,12 @@ def run_one_config(data_path, model, feature_extract, input_size, curr_hyper_par
     return best_val_acc, model, val_acc_list, train_acc_list
 
 
-def train_and_validate(model):
+def train_and_validate(model, num_classes, PATH_best_wts):
     ############ HYPER PARAMS ###########
     input_size = 224
     feature_extract = True
-    num_classes = 20 # CHECK
-    num_epochs = 1
+    #num_classes = 20 # CHECK
+    num_epochs = 15
     batch_sizes = [32, 264]
     learning_rates = [1, 1e-1, 1e-2, 1e-3, 1e-4, 1e-5, 1e-6]
     weight_decays = [1e-1, 1e-2, 1e-3, 1e-4, 1e-5, 1e-6]
@@ -418,7 +407,7 @@ def train_and_validate(model):
         curr_hyper_params = (batch_size, learning_rate, alpha, weight_decay)
 
         # Run complete training and validation with these hyperparams
-        val_acc, model, v_list, t_list = run_one_config(data_path, model, feature_extract, input_size, curr_hyper_params)
+        val_acc, model, v_list, t_list = run_one_config(data_path, model, feature_extract, input_size, curr_hyper_params, num_classes)
         
         print(f"run_one_config completed. batch_size: {batch_size}, learning_rate: {learning_rate}, alpha: {alpha}, weight_decay: {weight_decay}, val_acc: {val_acc}")
 
@@ -438,15 +427,17 @@ def train_and_validate(model):
 
     # load in the best weight from all 30 hyper params iterations 
     model.load_state_dict(best_model_wts)
+    torch.save(model.state_dict(), PATH_best_wts)
 
     print(f"Running best model ({best_val_acc}) on test set...")
 
     ############ JUST FOR TEST #############
-    freeze_all_but_4th_layer(model)
-    num_resnet = model.fc.in_features
-    model.fc = nn.Linear(num_resnet, num_classes)
-    device = torch.device("cuda")
-    model = model.to(device)
+    # freeze_all_but_4th_layer(model)
+    # num_resnet = model.fc.in_features
+    # model.fc = nn.Linear(num_resnet, num_classes)
+    # device = torch.device("cuda")
+    # model = model.to(device)
+    
     ############ JUST FOR TEST #############
 
 
@@ -466,19 +457,21 @@ if __name__ == '__main__':
     weights_resnet = ResNet50_Weights.DEFAULT
     preprocess_resnet = weights_resnet.transforms() 
 
-    # train_and_validate(model)
-    
-    num_resnet = model.fc.in_features
-    model.fc = nn.Linear(num_resnet, 20)  # 20 = num_classes
-    device = torch.device("cuda")
-    model = model.to(device)
+    # num_resnet = model.fc.in_features
+    # model.fc = nn.Linear(num_resnet, 20)  # 20 = num_classes
+    # device = torch.device("cuda")
+    # model = model.to(device)
 
-    PATH = "best_model_state_dict.pth"
-    model.load_state_dict(torch.load(PATH))
+    PATH_best_wts = "best_model_state_dict.pth"
+    
+    num_classes = 20
+    train_and_validate(model, num_classes, PATH_best_wts)
 
     ########### Test Set Run ###########
+    #model.load_state_dict(torch.load(PATH))
+    model.load_state_dict(torch.load(PATH_best_wts))
     test_model('top20_split_data', model)
-    #torch.save(model.state_dict(), PATH)
+    # torch.save(model.state_dict(), PATH)
 
 
     
