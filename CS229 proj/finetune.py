@@ -431,7 +431,7 @@ def train_and_validate(model, num_classes, num_epochs, search_iters, PATH_best_w
 
         #hardcode testing
         learning_rate = .001
-        weight_decays = .0001  # [1e-4, 1e-5, 1e-6]
+        weight_decay = .0001  # [1e-4, 1e-5, 1e-6]
         #alpha = 1.5  # np.random.uniform(.7,2)
         alpha = alphas[i]
         batch_size = 180  # np.random.random_integers(140, 260)
