@@ -466,8 +466,12 @@ if __name__ == '__main__':
     weights_resnet = ResNet50_Weights.DEFAULT
     preprocess_resnet = weights_resnet.transforms() 
 
-    #train_and_validate(model)
+    # train_and_validate(model)
     
+    num_resnet = model.fc.in_features
+    model.fc = nn.Linear(num_resnet, 20)  # 20 = num_classes
+    device = torch.device("cuda")
+    model = model.to(device)
 
     PATH = "best_model_state_dict.pth"
     model.load_state_dict(torch.load(PATH))
