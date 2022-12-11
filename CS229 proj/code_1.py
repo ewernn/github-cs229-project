@@ -21,6 +21,7 @@ import pandas as pd
 import torch.multiprocessing as mp
 from torch.nn.functional import softmax
 
+device = torch.device("cuda")
 
 ### Make Histogram ### 
 def make_histogram(data_path):
@@ -222,7 +223,6 @@ def freeze_all_but_4th_layer(model):
         param.requires_grad = False  # freeze layer
     num_resnet = model.fc.in_features
     model.fc = nn.Linear(num_resnet, num_classes)
-    device = torch.device("cuda")
     model = model.to(device)
 
 
@@ -271,7 +271,7 @@ def params_to_learn(model, feature_extract):
     return params_to_update
 
 
-def train_model(model, dataloaders, criterion, optimizer, num_epochs, device, alpha):
+def train_model(model, dataloaders, criterion, optimizer, num_epochs, alpha):
     since = time.time()
     val_acc_history = []
     train_acc_history = []
@@ -399,7 +399,7 @@ def run_one_config(data_path, model, feature_extract, input_size, curr_hyper_par
 
     ############ Train  Model ###########
     print(f"train_model() with batch_size: {batch_size}, learning_rate: {learning_rate}, alpha: {alpha}, weight_decay: {weight_decay}")
-    best_val_acc, model, val_acc_list, train_acc_list = train_model(model, data_loader, criterion, optimizer, num_epochs, device, alpha)
+    best_val_acc, model, val_acc_list, train_acc_list = train_model(model, data_loader, criterion, optimizer, num_epochs, alpha)
     return best_val_acc, model, val_acc_list, train_acc_list
 
 
