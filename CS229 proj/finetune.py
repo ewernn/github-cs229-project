@@ -333,6 +333,7 @@ def make_graph(val_hist, train_hist, num_epochs):
     plt.ylabel("Validation Accuracy")
     print(f"about to plot")
     print(f"vhist: {np.shape(vhist)} thist: {np.shape(thist)}, num_epochs: {num_epochs}")
+    #print(f"--------> {np.shape(vhist)},{np.shape(range(1,num_epochs+1))}")
     plt.plot(range(1,num_epochs+1),vhist,label="Validation Accuracy")
     plt.plot(range(1,num_epochs+1),thist,label="Training Accuracy")
     plt.ylim((0,1.))
@@ -382,7 +383,7 @@ def train_and_validate(model, num_classes, PATH_best_wts):
 
     hyper_params_performance = {}
 
-    best_val_acc = 0
+    best_val_acc = -1
     best_model_wts = copy.deepcopy(model.state_dict())
     best_hyper_params = None
     val_acc_list, train_acc_list = [], []
@@ -390,7 +391,7 @@ def train_and_validate(model, num_classes, PATH_best_wts):
 
     ########### Hyper Params Search ###########
 
-    search_iters = 0
+    search_iters = 1
     for i in range(search_iters):
         # Randomly sample the hyper params
         batch_size = np.random.random_integers(batch_sizes[0], batch_sizes[1])
