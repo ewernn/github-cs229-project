@@ -420,7 +420,7 @@ def train_and_validate(model, num_classes, num_epochs, search_iters, PATH_best_w
     val_acc_list, train_acc_list = [], []
 
     ########### Hyper Params Search ###########
-    alphas = [1.25,1.5,1.75,2,2.25]
+    alphas = [0,.5,2.5,3]
     search_iters = len(alphas)
     for i in range(search_iters):
         # Randomly sample the hyper params
