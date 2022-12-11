@@ -114,6 +114,9 @@ def test_model(data_path, model):
             pred = np.array(pred, dtype=np.float64)
             labels = np.array(labels, dtype=np.float64)
             pred[0]=1
+            if i==0:
+                print('-----')
+                print(np.shape(labels))
             labels[0]=1
             if i==0: 
                 print(f"---------- batch_size_test = {labels.size(0)} -------------")
@@ -412,7 +415,7 @@ if __name__ == '__main__':
 
     ########### Hyper Params Search ###########
 
-    search_iters = 1
+    search_iters = 0
     for i in range(search_iters):
         # Randomly sample the hyper params
         batch_size = np.random.random_integers(batch_sizes[0], batch_sizes[1])
@@ -458,19 +461,19 @@ if __name__ == '__main__':
     print(f"Running best model ({best_val_acc}) on test set...")
 
     ############ JUST FOR TEST #############
-    freeze_all_but_4th_layer(model)
-    num_resnet = model.fc.in_features
-    model.fc = nn.Linear(num_resnet, num_classes)
-    device = torch.device("cuda")
-    model = model.to(device)
+    # freeze_all_but_4th_layer(model)
+    # num_resnet = model.fc.in_features
+    # model.fc = nn.Linear(num_resnet, num_classes)
+    # device = torch.device("cuda")
+    # model = model.to(device)
     ############ JUST FOR TEST #############
 
-
-
+    PATH = "best_model_state_dict.pth"
+    model.load_state_dict(torch.load(PATH))
 
     ########### Test Set Run ###########
     test_model('top20_split_data', model)
-    torch.save(model.state_dict(), "best_model_state_dict.pth")
+    #torch.save(model.state_dict(), PATH)
 
 
     
