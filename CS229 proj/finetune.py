@@ -369,9 +369,9 @@ def run_one_config(data_path, model, feature_extract, input_size, curr_hyper_par
 
     #change
 
-    freeze_all_but_4th_layer(model)
-    num_resnet = model.fc.in_features 
-    model.fc = nn.Linear(num_resnet, num_classes)  # defaults to True
+    # freeze_all_but_4th_layer(model)
+    # num_resnet = model.fc.in_features 
+    # model.fc = nn.Linear(num_resnet, num_classes)  # defaults to True
     
     criterion = nn.CrossEntropyLoss()
 
@@ -394,6 +394,9 @@ def run_one_config(data_path, model, feature_extract, input_size, curr_hyper_par
 
 
 def train_and_validate(model, num_classes, num_epochs, PATH_best_wts):
+    
+    
+    freeze_all_but_4th_layer(model)    # <--------------
     ############ HYPER PARAMS ###########
     input_size = 224
     feature_extract = True
@@ -402,13 +405,10 @@ def train_and_validate(model, num_classes, num_epochs, PATH_best_wts):
     learning_rates = [1, 1e-1, 1e-2, 1e-3, 1e-4, 1e-5, 1e-6]
     weight_decays = [1e-1, 1e-2, 1e-3, 1e-4, 1e-5, 1e-6]
 
-    hyper_params_performance = {}
-
     best_val_acc = -1
     best_model_wts = copy.deepcopy(model.state_dict())
     best_hyper_params = None
     val_acc_list, train_acc_list = [], []
-
 
     ########### Hyper Params Search ###########
 
@@ -488,6 +488,10 @@ if __name__ == '__main__':
     
     num_classes = 20
     n_epochs = 15
+
+    num_resnet = model.fc.in_features
+    model.fc = nn.Linear(num_resnet, num_classes)
+    
     #train_and_validate(model, num_classes, n_epochs, PATH_best_wts)
 
     ########### Test Set Run ###########
