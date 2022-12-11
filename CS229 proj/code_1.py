@@ -377,7 +377,7 @@ if __name__ == '__main__':
     input_size = 224
     feature_extract = True
     num_classes = 20 # CHECK
-    num_epochs = 12
+    num_epochs = 1
     batch_sizes = [32, 264]
     learning_rates = [1, 1e-1, 1e-2, 1e-3, 1e-4, 1e-5, 1e-6]
     weight_decays = [1e-1, 1e-2, 1e-3, 1e-4, 1e-5, 1e-6]
@@ -392,7 +392,7 @@ if __name__ == '__main__':
 
     ########### Hyper Params Search ###########
 
-    search_iters = 0
+    search_iters = 1
     for i in range(search_iters):
         # Randomly sample the hyper params
         batch_size = np.random.random_integers(batch_sizes[0], batch_sizes[1])
@@ -402,9 +402,9 @@ if __name__ == '__main__':
 
         #hardcode testing
         learning_rate = .001
-        weight_decays = [1e-4, 1e-5, 1e-6]
-        alpha = np.random.uniform(.7,2)
-        batch_size = np.random.random_integers(140, 260)
+        weight_decay =  0.0001
+        alpha = 1.5
+        batch_size = 180
         
         curr_hyper_params = (batch_size, learning_rate, alpha, weight_decay)
 
@@ -420,48 +420,7 @@ if __name__ == '__main__':
             val_acc_list = v_list
             train_acc_list = t_list
 
-    # make_graph(val_acc_list, train_acc_list, num_epochs)
-
-
-
-    # Set the number of workers and the GPUs that the workers will use
-    # num_workers = search_iters
-    # gpus = [0]
-
-    # # Define the function that will be run by the workers
-    # def run_one_config_worker(i, data_path, model, feature_extract, input_size, best_val_acc, best_model_wts, best_hyper_params):
-    #     # Randomly sample the hyper params
-    #     batch_size = np.random.random_integers(batch_sizes[0], batch_sizes[1])
-    #     learning_rate = np.random.choice(learning_rates)
-    #     alpha = np.random.uniform()
-    #     weight_decay = np.random.choice(weight_decays)
-        
-    #     curr_hyper_params = (batch_size, learning_rate, alpha, weight_decay)
-
-    #     # Run complete training and validation with these hyperparams
-    #     val_acc, model = run_one_config(data_path, model, feature_extract, input_size, curr_hyper_params)
-
-    #     # Update the shared variables
-    #     if val_acc > best_val_acc.value:
-    #         best_val_acc.value = val_acc
-    #         best_model_wts.value = copy.deepcopy(model.state_dict())
-    #         best_hyper_params.value = curr_hyper_params
-
-    # # Create shared variables for the best accuracy, model weights, and hyperparameters
-    # best_val_acc = mp.Value("d", 0.0)
-    # best_model_wts = mp.Value("d", 0.0)
-    # best_hyper_params = mp.Value("d", 0.0)
-
-    # # Spawn the worker processes
-    # mp.spawn(run_one_config_worker, 
-    #          nprocs=num_workers, 
-    #          args=(data_path, model, feature_extract, input_size, best_val_acc, best_model_wts, best_hyper_params), 
-    #          gpus=gpus)
-
-    # Do something with the shared variables
-    # print(best_val_acc.value)
-    # print(best_model_wts.value)
-    # print(best_hyper_params.value)
+    make_graph(val_acc_list, train_acc_list, num_epochs)
     
     print(f"{search_iters} hyper param search iterations results:")
     print(f"best_val_acc: {best_val_acc}")
@@ -473,13 +432,12 @@ if __name__ == '__main__':
     print(f"Running best model ({best_val_acc}) on test set...")
 
     ############ JUST FOR TEST #############
-    set_parameter_requires_grad(model, feature_extract)
-    num_resnet = model.fc.in_features
-    model.fc = nn.Linear(num_resnet, num_classes)
-    device = torch.device("mps")
-    model = model.to(device)
+    # set_parameter_requires_grad(model, feature_extract)
+    # num_resnet = model.fc.in_features
+    # model.fc = nn.Linear(num_resnet, num_classes)
+    # device = torch.device("mps")
+    # model = model.to(device)
     ############ JUST FOR TEST #############
-
 
 
 
