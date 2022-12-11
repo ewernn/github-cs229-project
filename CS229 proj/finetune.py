@@ -81,7 +81,7 @@ def test_model(data_path, model):
     def print_shape(a, name):
         print(f"{name} shape: {np.shape(a)}")
 
-    device = torch.device("cuda")
+    # device = torch.device("cuda")
     # since we're not training, we don't need to calculate the gradients for our outputs
     with torch.no_grad():
         for data in testloader:
@@ -381,8 +381,8 @@ def run_one_config(data_path, model, feature_extract, input_size, curr_hyper_par
     params_to_update = params_to_learn(model, feature_extract)
 
     ########### Move Model to GPU #############
-    device = torch.device("cuda")
-    model = model.to(device)
+    #device = torch.device("cuda")
+    #model = model.to(device)
 
     optimizer = optim.Adam(params_to_update, lr=learning_rate, weight_decay=weight_decay)
     data_loader = load_data(data_path, model, feature_extract, input_size, batch_size)
@@ -491,7 +491,9 @@ if __name__ == '__main__':
 
     num_resnet = model.fc.in_features
     model.fc = nn.Linear(num_resnet, num_classes)
-    
+    device = torch.device("cuda")
+    model = model.to(device)
+
     #train_and_validate(model, num_classes, n_epochs, PATH_best_wts)
 
     ########### Test Set Run ###########
