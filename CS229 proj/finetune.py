@@ -178,10 +178,13 @@ def check_data():
 def debug_time(identifier,start):
     print(f"part {identifier} at {time.time()-start}")
 
-def set_parameter_requires_grad(model, feature_extracting):
-    if feature_extracting:
-        for param in model.parameters():
-            param.requires_grad = False
+# freezes all params
+def freeze_all_but_4th_layer(model):
+    for name,param in model.named_parameters():
+        layer = name.split('.')[0]  # e.g. layer3.5.bn3.bias[0]
+        #sublayer = name.split('.')[0]
+        if layer != 'layer4':
+            param.requires_grad = False  # freeze layer
 
 
 def load_data(data_path, model, feature_extract, input_size, b_size):
@@ -306,7 +309,6 @@ def train_model(model, dataloaders, criterion, optimizer, num_epochs, device, al
     # return model, val_acc_history, train_acc_history
     return best_acc, model, val_acc_history, train_acc_history
 
-
 def make_graph(val_hist, train_hist, num_epochs):
     # Initialize the non-pretrained version of the model used for this run
   
@@ -334,10 +336,13 @@ def make_graph(val_hist, train_hist, num_epochs):
 
 def run_one_config(data_path, model, feature_extract, input_size, curr_hyper_params):
     batch_size, learning_rate, alpha, weight_decay = curr_hyper_params
-    set_parameter_requires_grad(model, feature_extract)
-    num_resnet = model.fc.in_features
-    model.fc = nn.Linear(num_resnet, num_classes)
 
+    #change
+
+    freeze_all_but_4th_layer(model)
+    num_resnet = model.fc.in_features 
+    model.fc = nn.Linear(num_resnet, num_classes)  # defaults to True
+    
     criterion = nn.CrossEntropyLoss()
 
     # Feature Extraction Sanity Check
@@ -392,7 +397,7 @@ if __name__ == '__main__':
 
     ########### Hyper Params Search ###########
 
-    search_iters = 0
+    search_iters = 10
     for i in range(search_iters):
         # Randomly sample the hyper params
         batch_size = np.random.random_integers(batch_sizes[0], batch_sizes[1])
@@ -420,43 +425,8 @@ if __name__ == '__main__':
             val_acc_list = v_list
             train_acc_list = t_list
 
-    # make_graph(val_acc_list, train_acc_list, num_epochs)
+    make_graph(val_acc_list, train_acc_list, num_epochs)
 
-
-
-    # Set the number of workers and the GPUs that the workers will use
-    # num_workers = search_iters
-    # gpus = [0]
-
-    # # Define the function that will be run by the workers
-    # def run_one_config_worker(i, data_path, model, feature_extract, input_size, best_val_acc, best_model_wts, best_hyper_params):
-    #     # Randomly sample the hyper params
-    #     batch_size = np.random.random_integers(batch_sizes[0], batch_sizes[1])
-    #     learning_rate = np.random.choice(learning_rates)
-    #     alpha = np.random.uniform()
-    #     weight_decay = np.random.choice(weight_decays)
-        
-    #     curr_hyper_params = (batch_size, learning_rate, alpha, weight_decay)
-
-    #     # Run complete training and validation with these hyperparams
-    #     val_acc, model = run_one_config(data_path, model, feature_extract, input_size, curr_hyper_params)
-
-    #     # Update the shared variables
-    #     if val_acc > best_val_acc.value:
-    #         best_val_acc.value = val_acc
-    #         best_model_wts.value = copy.deepcopy(model.state_dict())
-    #         best_hyper_params.value = curr_hyper_params
-
-    # # Create shared variables for the best accuracy, model weights, and hyperparameters
-    # best_val_acc = mp.Value("d", 0.0)
-    # best_model_wts = mp.Value("d", 0.0)
-    # best_hyper_params = mp.Value("d", 0.0)
-
-    # # Spawn the worker processes
-    # mp.spawn(run_one_config_worker, 
-    #          nprocs=num_workers, 
-    #          args=(data_path, model, feature_extract, input_size, best_val_acc, best_model_wts, best_hyper_params), 
-    #          gpus=gpus)
 
     # Do something with the shared variables
     # print(best_val_acc.value)
@@ -473,7 +443,7 @@ if __name__ == '__main__':
     print(f"Running best model ({best_val_acc}) on test set...")
 
     ############ JUST FOR TEST #############
-    set_parameter_requires_grad(model, feature_extract)
+    freeze_all_but_4th_layer(model)
     num_resnet = model.fc.in_features
     model.fc = nn.Linear(num_resnet, num_classes)
     device = torch.device("mps")
@@ -497,10 +467,4 @@ if __name__ == '__main__':
     # with open("hyper_params_performance.json", "w") as f:
     #     f.write(json_string)
     
-
-
-
-
-
-
 
