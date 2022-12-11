@@ -217,7 +217,7 @@ def debug_time(identifier,start):
     print(f"part {identifier} at {time.time()-start}")
 
 # freezes all params
-def freeze_params(model):
+def freeze_all_but_4th_layer(model):
     for name,param in model.named_parameters():
         param.requires_grad = False  # freeze layer
 
@@ -375,7 +375,7 @@ def run_one_config(data_path, model, feature_extract, input_size, curr_hyper_par
 
     #change
 
-    # freeze_params(model)
+    # freeze_all_but_4th_layer(model)
     # num_resnet = model.fc.in_features 
     # model.fc = nn.Linear(num_resnet, num_classes)  # defaults to True
     
@@ -402,7 +402,7 @@ def run_one_config(data_path, model, feature_extract, input_size, curr_hyper_par
 def train_and_validate(model, num_classes, num_epochs, search_iters, PATH_best_wts):
     
     
-    freeze_params(model)    # <--------------
+    freeze_all_but_4th_layer(model)    # <--------------
     ############ HYPER PARAMS ###########
     input_size = 224
     feature_extract = True
@@ -460,7 +460,7 @@ def train_and_validate(model, num_classes, num_epochs, search_iters, PATH_best_w
     print(f"Running best model ({best_val_acc}) on test set...")
 
     ############ JUST FOR TEST #############
-    # freeze_params(model)
+    # freeze_all_but_4th_layer(model)
     # num_resnet = model.fc.in_features
     # model.fc = nn.Linear(num_resnet, num_classes)
     # device = torch.device("cuda")
@@ -517,4 +517,3 @@ if __name__ == '__main__':
     # with open("hyper_params_performance.json", "w") as f:
     #     f.write(json_string)
     
-
