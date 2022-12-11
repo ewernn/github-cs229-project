@@ -145,12 +145,13 @@ def test_model(data_path, model):
     print('-------------------')
     print(f"cf_matrix vals are \n {cf_matrix}")
     cf_matrix = normalize_cf(cf_matrix)
-    class_labels = [i for i in unsorted_countries]
+    class_labels = [i[4:] for i in unsorted_countries]
     print('-------------------')
     print(f"cf_matrix vals are \n {cf_matrix}")
     df_cm = pd.DataFrame(cf_matrix/np.sum(cf_matrix) *10, index=class_labels, columns=class_labels)
     plt.figure(figsize = (12,7))
     sn.heatmap(df_cm, annot=True)
+    plt.xticks(rotation=45)
     plt.savefig('confusion_matrix.png')
 
 
