@@ -118,9 +118,8 @@ def test_model(data_path, model):
                 print('-----')
                 print(np.shape(labels))
             labels[0]=1
-            if i==0: 
-                print(f"labels shape = {np.shape(labels)}.  labels.size = {labels.size}")
-                print(f"---------- batch_size_test = {labels.size[0]} -------------")
+            if i==0:
+                print(f"---------- batch_size_test = {labels.shape[0]} -------------")
                 print(f"labels: \n{labels} \n\n pred: \n{pred}")
                 print(f"correct_iter = {np.sum(pred == labels)}")
             i=1
