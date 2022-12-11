@@ -376,7 +376,7 @@ def train_and_validate(model, num_classes, PATH_best_wts):
     input_size = 224
     feature_extract = True
     #num_classes = 20 # CHECK
-    num_epochs = 15
+    num_epochs = 3
     batch_sizes = [32, 264]
     learning_rates = [1, 1e-1, 1e-2, 1e-3, 1e-4, 1e-5, 1e-6]
     weight_decays = [1e-1, 1e-2, 1e-3, 1e-4, 1e-5, 1e-6]
