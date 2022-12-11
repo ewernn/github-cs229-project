@@ -141,6 +141,8 @@ def test_model(data_path, model):
         return cf_mtrx
 
     cf_matrix = confusion_matrix(y_true, y_pred)  # (n_data, n_data)
+    print('-------------------')
+    print(f"cf_matrix vals are \n {cf_matrix}")
     cf_matrix = normalize_cf(cf_matrix)
     class_labels = [i for i in unsorted_countries]
     print('-------------------')
