@@ -382,7 +382,7 @@ if __name__ == '__main__':
     input_size = 224
     feature_extract = True
     num_classes = 20 # CHECK
-    num_epochs = 12
+    num_epochs = 8
     batch_sizes = [32, 264]
     learning_rates = [1, 1e-1, 1e-2, 1e-3, 1e-4, 1e-5, 1e-6]
     weight_decays = [1e-1, 1e-2, 1e-3, 1e-4, 1e-5, 1e-6]
@@ -397,7 +397,7 @@ if __name__ == '__main__':
 
     ########### Hyper Params Search ###########
 
-    search_iters = 10
+    search_iters = 1
     for i in range(search_iters):
         # Randomly sample the hyper params
         batch_size = np.random.random_integers(batch_sizes[0], batch_sizes[1])
@@ -407,9 +407,9 @@ if __name__ == '__main__':
 
         #hardcode testing
         learning_rate = .001
-        weight_decays = [1e-4, 1e-5, 1e-6]
-        alpha = np.random.uniform(.7,2)
-        batch_size = np.random.random_integers(140, 260)
+        weight_decays = .0001  # [1e-4, 1e-5, 1e-6]
+        alpha = 1.5  # np.random.uniform(.7,2)
+        batch_size = 180  # np.random.random_integers(140, 260)
         
         curr_hyper_params = (batch_size, learning_rate, alpha, weight_decay)
 
