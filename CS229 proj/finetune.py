@@ -108,7 +108,9 @@ def test_model(data_path, model):
             # the class with the highest energy is what we choose as prediction
             # _, predicted = torch.max(outputs.data, 1)
             total += labels.size(0)
-            correct += (pred == labels).sum().item()
+            # print_shape(pred, "pred")
+            # print_shape(labels, "labels")
+            correct += len(labels[labels==pred])  # (pred == labels).sum().item()
     print(f"percent correct on the test set: {correct / total}")
 
     cf_matrix = confusion_matrix(y_true, y_pred)
@@ -383,7 +385,7 @@ if __name__ == '__main__':
     input_size = 224
     feature_extract = True
     num_classes = 20 # CHECK
-    num_epochs = 2
+    num_epochs = 1
     batch_sizes = [32, 264]
     learning_rates = [1, 1e-1, 1e-2, 1e-3, 1e-4, 1e-5, 1e-6]
     weight_decays = [1e-1, 1e-2, 1e-3, 1e-4, 1e-5, 1e-6]
