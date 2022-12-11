@@ -54,7 +54,8 @@ def make_histogram(data_path):
     plt.show()
 
 
-def test_model(data_path, model):
+def test_model(data_path, model, PATH_best_wts):
+    model.load_state_dict(torch.load(PATH_best_wts))
     #testing and confusion matrix
 
     transform = transforms.Compose([
@@ -401,7 +402,7 @@ def run_one_config(data_path, model, feature_extract, input_size, curr_hyper_par
     return best_val_acc, model, val_acc_list, train_acc_list
 
 
-def train_and_validate(model, num_classes, num_epochs, PATH_best_wts):
+def train_and_validate(model, num_classes, num_epochs, search_iters, PATH_best_wts):
     
     
     freeze_all_but_4th_layer(model)    # <--------------
@@ -419,8 +420,8 @@ def train_and_validate(model, num_classes, num_epochs, PATH_best_wts):
     val_acc_list, train_acc_list = [], []
 
     ########### Hyper Params Search ###########
-
-    search_iters = 1
+    alphas = [1.25,1.5,1.75,2,2.25]
+    search_iters = len(alphas)
     for i in range(search_iters):
         # Randomly sample the hyper params
         batch_size = np.random.random_integers(batch_sizes[0], batch_sizes[1])
@@ -431,7 +432,8 @@ def train_and_validate(model, num_classes, num_epochs, PATH_best_wts):
         #hardcode testing
         learning_rate = .001
         weight_decays = .0001  # [1e-4, 1e-5, 1e-6]
-        alpha = 1.5  # np.random.uniform(.7,2)
+        #alpha = 1.5  # np.random.uniform(.7,2)
+        alpha = alpha[i]
         batch_size = 180  # np.random.random_integers(140, 260)
         
         curr_hyper_params = (batch_size, learning_rate, alpha, weight_decay)
@@ -496,20 +498,19 @@ if __name__ == '__main__':
     
     num_classes = 20
     n_epochs = 15
+    search_iters = 1
 
     num_resnet = model.fc.in_features
     model.fc = nn.Linear(num_resnet, num_classes)
     device = torch.device("cuda")
     model = model.to(device)
 
-    #train_and_validate(model, num_classes, n_epochs, PATH_best_wts)
+    ########### TRAIN/VAL and,or TEST ###########
+    train_and_validate(model, num_classes, n_epochs, search_iters, PATH_best_wts)
 
-    ########### Test Set Run ###########
-    #model.load_state_dict(torch.load(PATH))
-    model.load_state_dict(torch.load(PATH_best_wts))
-    test_model('top20_split_data', model)
-    # torch.save(model.state_dict(), PATH)
-
+    # model.load_state_dict(torch.load(PATH_best_wts))
+    # test_model('top20_split_data', model, PATH_best_wts)
+    #############################################
 
     
     # # Process Dictionary
