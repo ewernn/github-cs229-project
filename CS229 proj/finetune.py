@@ -84,6 +84,7 @@ def test_model(data_path, model):
     device = torch.device("cuda")
     # since we're not training, we don't need to calculate the gradients for our outputs
     with torch.no_grad():
+        i=0
         for data in testloader:
             images, labels = data
             images = images.to(device)
@@ -104,18 +105,25 @@ def test_model(data_path, model):
             else: 
                 y_pred = np.concatenate([y_pred, pred])
                 y_true = np.concatenate([y_true, labels.numpy()])
-            
+            if i: 
+                print(f"labels: \n{labels} \n\n pred: \n{pred}")
+                print(f"correct_iter = {np.sum(pred == labels)}")
+            i=1
             # the class with the highest energy is what we choose as prediction
             # _, predicted = torch.max(outputs.data, 1)
+            labels = np.array(labels)
             total += labels.size(0)
             # print_shape(pred, "pred")
             # print_shape(labels, "labels")
-            correct += len(labels[labels==pred])  # (pred == labels).sum().item()
-    print(f"percent correct on the test set: {correct / total}")
 
-    cf_matrix = confusion_matrix(y_true, y_pred)
-    df_cm = pd.DataFrame(cf_matrix/np.sum(cf_matrix) *10, index = [i for i in unsorted_countries],
-                        columns = [i for i in unsorted_countries])
+            correct += np.sum(pred == labels)  # (pred == labels).sum().item()
+    total = len(testloader.dataset)
+    print(f"percent correct on the test set: {correct / total}")
+    # epoch accuracy calculated like:    epoch_acc = running_corrects.float() / len(dataloaders[phase].dataset)
+
+    cf_matrix = confusion_matrix(y_true, y_pred)  # (n_data, n_data)
+    class_labels = [i for i in unsorted_countries]
+    df_cm = pd.DataFrame(cf_matrix/np.sum(cf_matrix) *10, index=class_labels, columns=class_labels)
     plt.figure(figsize = (12,7))
     sn.heatmap(df_cm, annot=True)
     plt.savefig('confusion_matrix.png')
