@@ -222,7 +222,7 @@ def freeze_all_but_4th_layer(model):
     for name,param in model.named_parameters():
         layer = name.split('.')[0]  # e.g. layer3.5.bn3.bias[0]
         #sublayer = name.split('.')[0]
-        if layer != 'layer4' and layer != 'layer3':
+        if layer != 'layer4':
             param.requires_grad = False  # freeze layer
     num_resnet = model.fc.in_features
     model.fc = nn.Linear(num_resnet, num_classes)
@@ -501,7 +501,7 @@ if __name__ == '__main__':
     PATH_best_wts = "best_model_state_dict.pth"
     
     num_classes = 20
-    n_epochs = 20
+    n_epochs = 50
     search_iters = 1
 
     # num_resnet = model.fc.in_features
