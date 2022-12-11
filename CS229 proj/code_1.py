@@ -220,6 +220,10 @@ def debug_time(identifier,start):
 def freeze_all_but_4th_layer(model):
     for name,param in model.named_parameters():
         param.requires_grad = False  # freeze layer
+    num_resnet = model.fc.in_features
+    model.fc = nn.Linear(num_resnet, num_classes)
+    device = torch.device("cuda")
+    model = model.to(device)
 
 
 def load_data(data_path, model, feature_extract, input_size, b_size):
@@ -402,7 +406,7 @@ def run_one_config(data_path, model, feature_extract, input_size, curr_hyper_par
 def train_and_validate(model, num_classes, num_epochs, search_iters, PATH_best_wts):
     
     
-    freeze_all_but_4th_layer(model)    # <--------------
+    #freeze_all_but_4th_layer(model)    # <--------------
     ############ HYPER PARAMS ###########
     input_size = 224
     feature_extract = True
@@ -419,6 +423,7 @@ def train_and_validate(model, num_classes, num_epochs, search_iters, PATH_best_w
     ########### Hyper Params Search ###########
     search_iters = 1
     for i in range(search_iters):
+        freeze_all_but_4th_layer(model)
         # Randomly sample the hyper params
         batch_size = np.random.random_integers(batch_sizes[0], batch_sizes[1])
         learning_rate = np.random.choice(learning_rates)
@@ -496,10 +501,10 @@ if __name__ == '__main__':
     n_epochs = 10
     search_iters = 1
 
-    num_resnet = model.fc.in_features
-    model.fc = nn.Linear(num_resnet, num_classes)
-    device = torch.device("cuda")
-    model = model.to(device)
+    # num_resnet = model.fc.in_features
+    # model.fc = nn.Linear(num_resnet, num_classes)
+    # device = torch.device("cuda")
+    # model = model.to(device)
 
     ########### TRAIN/VAL and,or TEST ###########
     train_and_validate(model, num_classes, n_epochs, search_iters, PATH_best_wts)
