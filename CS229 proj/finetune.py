@@ -111,6 +111,8 @@ def test_model(data_path, model):
             total += labels.size(0)
             # print_shape(pred, "pred")
             # print_shape(labels, "labels")
+            pred = np.array(pred, dtype=np.float64)
+            labels = np.array(labels, dtype=np.float64)
             pred[0]=1
             labels[0]=1
             if i==0: 
