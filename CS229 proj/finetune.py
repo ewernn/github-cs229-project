@@ -371,12 +371,11 @@ def run_one_config(data_path, model, feature_extract, input_size, curr_hyper_par
     return best_val_acc, model, val_acc_list, train_acc_list
 
 
-def train_and_validate(model, num_classes, PATH_best_wts):
+def train_and_validate(model, num_classes, num_epochs, PATH_best_wts):
     ############ HYPER PARAMS ###########
     input_size = 224
     feature_extract = True
     #num_classes = 20 # CHECK
-    num_epochs = 3
     batch_sizes = [32, 264]
     learning_rates = [1, 1e-1, 1e-2, 1e-3, 1e-4, 1e-5, 1e-6]
     weight_decays = [1e-1, 1e-2, 1e-3, 1e-4, 1e-5, 1e-6]
@@ -466,7 +465,8 @@ if __name__ == '__main__':
     PATH_best_wts = "best_model_state_dict.pth"
     
     num_classes = 20
-    train_and_validate(model, num_classes, PATH_best_wts)
+    n_epochs = 3
+    train_and_validate(model, num_classes, n_epochs, PATH_best_wts)
 
     ########### Test Set Run ###########
     #model.load_state_dict(torch.load(PATH))
