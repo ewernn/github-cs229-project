@@ -117,7 +117,29 @@ def test_model(data_path, model):
     print(f"percent correct on the test set: {correct / total}")
     # epoch accuracy calculated like:    epoch_acc = running_corrects.float() / len(dataloaders[phase].dataset)
 
+
+    def normalize_cf(cf_mtrx):
+        # unsorted_countries = testloader.dataset.classes
+        n_pics_by_country = dict()
+        dataset = 'top20_split_data'
+        for kind in os.listdir(dataset):
+            if kind != 'train': continue
+            train_path = dataset+'/'+kind
+            for country in os.listdir(train_path):
+                if country == '.DS_Store': continue
+                f_country = train_path+'/'+country
+                n_pics_by_country[country] = len(os.listdir(f_country))
+
+        num_classes = len(unsorted_countries)
+        magnitude_matrix = np.zeros((num_classes, num_classes))
+        for i,c1 in enumerate(unsorted_countries):
+            for j,c2 in enumerate(unsorted_countries):
+                # magnitude_matrix[i,j] = n_pics_by_country[c1] * n_pics_by_country[c2]
+                cf_mtrx[i,j] *= n_pics_by_country[c1] * n_pics_by_country[c2]
+        return cf_mtrx
+
     cf_matrix = confusion_matrix(y_true, y_pred)  # (n_data, n_data)
+    cf_matrix = normalize_cf(cf_matrix)
     class_labels = [i for i in unsorted_countries]
     df_cm = pd.DataFrame(cf_matrix/np.sum(cf_matrix) *10, index=class_labels, columns=class_labels)
     plt.figure(figsize = (12,7))
@@ -466,7 +488,7 @@ if __name__ == '__main__':
     
     num_classes = 20
     n_epochs = 15
-    train_and_validate(model, num_classes, n_epochs, PATH_best_wts)
+    #train_and_validate(model, num_classes, n_epochs, PATH_best_wts)
 
     ########### Test Set Run ###########
     #model.load_state_dict(torch.load(PATH))
