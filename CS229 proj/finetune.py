@@ -136,7 +136,8 @@ def test_model(data_path, model):
         for i,c1 in enumerate(unsorted_countries):
             for j,c2 in enumerate(unsorted_countries):
                 # magnitude_matrix[i,j] = n_pics_by_country[c1] * n_pics_by_country[c2]
-                cf_mtrx[i,j] /= ((n_pics_by_country[c1] * n_pics_by_country[c2]) / (n_usa**2))
+                avg_pics_c1_c2 = np.sqrt((n_pics_by_country[c1]**2 + n_pics_by_country[c2]**2))
+                cf_mtrx[i,j] /= avg_pics_c1_c2 # / (n_usa**2))
         return cf_mtrx
 
     cf_matrix = confusion_matrix(y_true, y_pred)  # (n_data, n_data)
