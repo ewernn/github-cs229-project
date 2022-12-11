@@ -341,7 +341,7 @@ def make_graph(val_hist, train_hist, num_epochs):
     plt.savefig(os.path.join('acc_history.png'))
     # plt.show()
 
-def run_one_config(data_path, model, feature_extract, input_size, curr_hyper_params, num_classes):
+def run_one_config(data_path, model, feature_extract, input_size, curr_hyper_params, num_classes, num_epochs):
     batch_size, learning_rate, alpha, weight_decay = curr_hyper_params
 
     #change
@@ -407,7 +407,7 @@ def train_and_validate(model, num_classes, PATH_best_wts):
         curr_hyper_params = (batch_size, learning_rate, alpha, weight_decay)
 
         # Run complete training and validation with these hyperparams
-        val_acc, model, v_list, t_list = run_one_config(data_path, model, feature_extract, input_size, curr_hyper_params, num_classes)
+        val_acc, model, v_list, t_list = run_one_config(data_path, model, feature_extract, input_size, curr_hyper_params, num_classes, num_epochs)
         
         print(f"run_one_config completed. batch_size: {batch_size}, learning_rate: {learning_rate}, alpha: {alpha}, weight_decay: {weight_decay}, val_acc: {val_acc}")
 
