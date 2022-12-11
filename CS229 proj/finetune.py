@@ -110,7 +110,7 @@ def test_model(data_path, model):
             # total += labels.size(0)
             # correct += (predicted == labels).sum().item()
 
-    cf_matrix = confusion_matrix(y_pred, y_true)
+    cf_matrix = confusion_matrix(y_true, y_pred)
     df_cm = pd.DataFrame(cf_matrix/np.sum(cf_matrix) *10, index = [i for i in unsorted_countries],
                         columns = [i for i in unsorted_countries])
     plt.figure(figsize = (12,7))
@@ -382,7 +382,7 @@ if __name__ == '__main__':
     input_size = 224
     feature_extract = True
     num_classes = 20 # CHECK
-    num_epochs = 8
+    num_epochs = 1
     batch_sizes = [32, 264]
     learning_rates = [1, 1e-1, 1e-2, 1e-3, 1e-4, 1e-5, 1e-6]
     weight_decays = [1e-1, 1e-2, 1e-3, 1e-4, 1e-5, 1e-6]
