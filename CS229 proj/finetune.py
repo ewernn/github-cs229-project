@@ -131,11 +131,12 @@ def test_model(data_path, model):
                 n_pics_by_country[country] = len(os.listdir(f_country))
 
         num_classes = len(unsorted_countries)
+        n_usa = np.float64(n_pics_by_country['new_United States'])
         magnitude_matrix = np.zeros((num_classes, num_classes))
         for i,c1 in enumerate(unsorted_countries):
             for j,c2 in enumerate(unsorted_countries):
                 # magnitude_matrix[i,j] = n_pics_by_country[c1] * n_pics_by_country[c2]
-                cf_mtrx[i,j] /= (n_pics_by_country[c1] * n_pics_by_country[c2])
+                cf_mtrx[i,j] /= ((n_pics_by_country[c1] * n_pics_by_country[c2]) / (n_usa**2))
         return cf_mtrx
 
     cf_matrix = confusion_matrix(y_true, y_pred)  # (n_data, n_data)
