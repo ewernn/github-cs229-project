@@ -420,8 +420,7 @@ def train_and_validate(model, num_classes, num_epochs, search_iters, PATH_best_w
     val_acc_list, train_acc_list = [], []
 
     ########### Hyper Params Search ###########
-    alphas = [5]
-    search_iters = len(alphas)
+    search_iters = 1
     for i in range(search_iters):
         # Randomly sample the hyper params
         batch_size = np.random.random_integers(batch_sizes[0], batch_sizes[1])
@@ -433,7 +432,7 @@ def train_and_validate(model, num_classes, num_epochs, search_iters, PATH_best_w
         learning_rate = .001
         weight_decay = .0001  # [1e-4, 1e-5, 1e-6]
         #alpha = 1.5  # np.random.uniform(.7,2)
-        alpha = alphas[i]
+        alpha = 2.5
         batch_size = 180  # np.random.random_integers(140, 260)
         
         curr_hyper_params = (batch_size, learning_rate, alpha, weight_decay)
@@ -497,7 +496,7 @@ if __name__ == '__main__':
     PATH_best_wts = "best_model_state_dict.pth"
     
     num_classes = 20
-    n_epochs = 3
+    n_epochs = 20
     search_iters = 1
 
     num_resnet = model.fc.in_features
@@ -508,8 +507,8 @@ if __name__ == '__main__':
     ########### TRAIN/VAL and,or TEST ###########
     train_and_validate(model, num_classes, n_epochs, search_iters, PATH_best_wts)
 
-    # model.load_state_dict(torch.load(PATH_best_wts))
-    # test_model('top20_split_data', model, PATH_best_wts)
+    
+    test_model('top20_split_data', model, PATH_best_wts)
     #############################################
 
     
