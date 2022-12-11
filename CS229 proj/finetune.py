@@ -381,21 +381,7 @@ def run_one_config(data_path, model, feature_extract, input_size, curr_hyper_par
     return best_val_acc, model, val_acc_list, train_acc_list
 
 
-if __name__ == '__main__':
-    # assert torch.cuda.is_available() == True
-    ssl._create_default_https_context = ssl._create_unverified_context
-
-    # LOAD DATA
-    data_path = 'top20_split_data'
-    check_data()
-
-    # Model selection 
-    # Resnet50 takes inputs of dim (224,224,3)
-    model = resnet50(weights=ResNet50_Weights.DEFAULT)
-    weights_resnet = ResNet50_Weights.DEFAULT
-    preprocess_resnet = weights_resnet.transforms() 
-
-    
+def train_and_validate(model):
     ############ HYPER PARAMS ###########
     input_size = 224
     feature_extract = True
@@ -445,11 +431,6 @@ if __name__ == '__main__':
 
     make_graph(val_acc_list, train_acc_list, num_epochs)
 
-
-    # Do something with the shared variables
-    # print(best_val_acc.value)
-    # print(best_model_wts.value)
-    # print(best_hyper_params.value)
     
     print(f"{search_iters} hyper param search iterations results:")
     print(f"best_val_acc: {best_val_acc}")
@@ -461,12 +442,32 @@ if __name__ == '__main__':
     print(f"Running best model ({best_val_acc}) on test set...")
 
     ############ JUST FOR TEST #############
-    # freeze_all_but_4th_layer(model)
-    # num_resnet = model.fc.in_features
-    # model.fc = nn.Linear(num_resnet, num_classes)
-    # device = torch.device("cuda")
-    # model = model.to(device)
+    freeze_all_but_4th_layer(model)
+    num_resnet = model.fc.in_features
+    model.fc = nn.Linear(num_resnet, num_classes)
+    device = torch.device("cuda")
+    model = model.to(device)
     ############ JUST FOR TEST #############
+
+
+
+
+if __name__ == '__main__':
+    # assert torch.cuda.is_available() == True
+    ssl._create_default_https_context = ssl._create_unverified_context
+
+    # LOAD DATA
+    data_path = 'top20_split_data'
+    check_data()
+
+    # Model selection 
+    # Resnet50 takes inputs of dim (224,224,3)
+    model = resnet50(weights=ResNet50_Weights.DEFAULT)
+    weights_resnet = ResNet50_Weights.DEFAULT
+    preprocess_resnet = weights_resnet.transforms() 
+
+    #train_and_validate(model)
+    
 
     PATH = "best_model_state_dict.pth"
     model.load_state_dict(torch.load(PATH))
