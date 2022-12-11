@@ -222,7 +222,7 @@ def freeze_all_but_4th_layer(model):
     for name,param in model.named_parameters():
         layer = name.split('.')[0]  # e.g. layer3.5.bn3.bias[0]
         #sublayer = name.split('.')[0]
-        if layer != 'layer4':
+        if layer != 'layer4' and layer != 'layer3':
             param.requires_grad = False  # freeze layer
     num_resnet = model.fc.in_features
     model.fc = nn.Linear(num_resnet, num_classes)
@@ -375,7 +375,7 @@ def make_graph(val_hist, train_hist, num_epochs):
     plt.xticks(np.arange(1, num_epochs+1, 1.0))
     plt.legend()
     plt.savefig(os.path.join('acc_history.png'))
-    # plt.show()
+    plt.show()
 
 def run_one_config(data_path, model, feature_extract, input_size, curr_hyper_params, num_classes, num_epochs):
     batch_size, learning_rate, alpha, weight_decay = curr_hyper_params
@@ -501,7 +501,7 @@ if __name__ == '__main__':
     PATH_best_wts = "best_model_state_dict.pth"
     
     num_classes = 20
-    n_epochs = 10
+    n_epochs = 20
     search_iters = 1
 
     # num_resnet = model.fc.in_features
